@@ -105,8 +105,8 @@ function footballPlay(play,watch){
       const m=new RegExp('\\bat\\s+'+opp+'\\s+(\\d{1,2})\\b','i').exec(text);
       if(m&&Number(m[1])<=20&&Number(m[1])>0)add('redZoneEntries',1,'Offense reached the opposing red zone');
     }
-    if(play.scoringPlay&&/\\btouchdown\\b|\\bfield goal\\b.*\\b(good|made)\\b/i.test(text))add('scoringDrives',1,'Scoring drive');
-    if(/\\bintercepted\\b/i.test(text)||(/\\bfumbles?\\b/i.test(text)&&/\\brecovered by\\b/i.test(text)))add('turnovers',1,'Turnover on offensive possession');
+    if(play.scoringPlay&&/\btouchdown\b|\bfield goal\b.*\b(good|made)\b/i.test(text))add('scoringDrives',1,'Scoring drive');
+    if(/\bintercepted\b/i.test(text)||(/\bfumbles?\b/i.test(text)&&/\brecovered by\b/i.test(text)))add('turnovers',1,'Turnover on offensive possession');
   }
   return out;
 }
