@@ -125,10 +125,18 @@ async function handle(req,res){
     }
     if(req.method==='GET'&&route==='/api/roster'){
       const sport=url.searchParams.get('sport')||'nfl',teamId=url.searchParams.get('team')||'';
+      const gameId=url.searchParams.get('game')||'';
       if(!espnProviders[sport]||!/^\d{1,8}$/.test(teamId))throw new Error('Invalid league or team');
-      const k=`${sport}:${teamId}`;let entry=rosterCache.get(k);
-      if(!entry||Date.now()-entry.at>21600000){entry={at:Date.now(),data:await espnProviders[sport].roster(teamId)};rosterCache.set(k,entry);}
-      return send(res,200,{players:entry.data});
+      if(gameId&&!/^[0-9]{6,14}$/.test(gameId))throw new Error('Invalid game');
+      const k=`${sport}:${teamId}:${gameId}`,now=Date.now();
+      let entry=rosterCache.get(k);
+      const ttl=gameId?120000:1800000;
+      if(!entry||now-entry.at>ttl){
+        entry={at:now,data:await espnProviders[sport].roster(teamId,{gameId})};
+        rosterCache.set(k,entry);
+        if(rosterCache.size>250)rosterCache.delete(rosterCache.keys().next().value);
+      }
+      return send(res,200,{players:entry.data,order:'ESPN depth chart, team leaders, game statistics; alphabetical fallback'});
     }
     if(req.method==='GET'&&route==='/api/games'){
       const sport=url.searchParams.get('sport')||'nfl',date=url.searchParams.get('date')||'';
