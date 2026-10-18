@@ -113,7 +113,7 @@ async function handle(req,res){
     if(route==='/api/discord/test'&&req.method==='POST'){
       const d=state.discord[ownerId];
       if(!d?.enabled||!validateWebhook(d.url))throw new Error('Enable your Discord integration first');
-      const result=await sendDiscordAlert(d,{ownerId,category:'target',name:'LiveStat',detail:'Test message from LiveStat',game:'Test connection',demo:false});
+      const result=await sendDiscordAlert({...d,types:['target']},{ownerId,category:'target',name:'LiveStat',detail:'Test message from LiveStat',game:'Test connection',demo:false});
       if(!result.sent)throw new Error('Discord rejected the test or relay is rate limited');
       return send(res,200,{sent:true});
     }
