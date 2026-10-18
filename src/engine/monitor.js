@@ -57,11 +57,48 @@ export function makeMonitor({providers,provider,state,deliver,emit=()=>{}}){
       // Crossing check handles 14 -> 17, and emits milestone ONCE per game.
       if(rule.target!=null&&old<rule.target&&next>=rule.target)
         alerts.push(makeAlert({watch,event,game,play,category:'target',oldTotal:old,total:next,target:rule.target,demo}));
+
+      if(rule.target!=null&&(watch.smart?.near||0)>0&&next<rule.target&&next>=rule.target-watch.smart.near&&old<rule.target-watch.smart.near){
+        const nearId=demo?'demo-'+crypto.randomUUID():watch.id+':'+gk+':near:'+event.stat+':'+rule.target;
+        if(demo||!state.notified[nearId]){
+          if(!demo)state.notified[nearId]=Date.now();
+          const advance={id:nearId,watchId:watch.id,sport:watch.sport||'nfl',name:watch.name,kind:watch.kind,
+            stat:event.stat,category:'near',label:'⚡ ALMOST THERE · '+event.label,
+            detail:next+'/'+rule.target+' '+event.label.toLowerCase()+' (only '+(rule.target-next)+' remaining)',
+            game:game.name,description:play.text,period:play.period,clock:play.clock,demo,time:new Date().toISOString()};
+          state.alerts.unshift(advance);emit('alert',advance);sent++;
+          try{await deliver(advance)}catch(err){state.stats.lastError='Push failed: '+err.message;}
+        }
+      }
       for(const alert of alerts){
         if(!demo&&state.notified[alert.id])continue;
         if(!demo)state.notified[alert.id]=Date.now();
         state.alerts.unshift(alert);emit('alert',alert);sent++;
         try{await deliver(alert)}catch(err){state.stats.lastError=`Push failed: ${err.message}`;}
+      }
+    }
+
+    // Compound mission rules. The target for each stat is still checked independently.
+    const smart=watch.smart||{},goals=Object.entries(watch.rules||{}).filter(([,r])=>r.target!=null);
+    if(goals.length>=2&&['all','any'].includes(smart.combine)){
+      const reached=goals.map(([stat,r])=>(totals[totalKey(gk,watch,stat)]||0)>=r.target);
+      const meets=smart.combine==='all'?reached.every(Boolean):reached.some(Boolean);
+      const period=Number(play.period)||0;
+      const scores=Number.isFinite(play.homeScore)&&Number.isFinite(play.awayScore);
+      const situational=(smart.periodMin==null||period>=smart.periodMin)&&
+        (smart.maxMargin==null||(scores&&Math.abs(play.homeScore-play.awayScore)<=smart.maxMargin));
+      if(meets&&situational){
+        const id=demo?'demo-'+crypto.randomUUID():watch.id+':'+gk+':combo:'+smart.combine;
+        if(demo||!state.notified[id]){
+          if(!demo)state.notified[id]=Date.now();
+          const completed=reached.filter(Boolean).length;
+          const event={id,watchId:watch.id,sport:watch.sport||'nfl',name:watch.name,kind:watch.kind,
+            stat:'mission',category:'target',target:completed,label:'🏆 MISSION COMPLETE',
+            detail:completed+'/'+goals.length+' target objectives achieved ('+smart.combine.toUpperCase()+')',
+            description:play.text,game:game.name,period:play.period,clock:play.clock,demo,time:new Date().toISOString()};
+          state.alerts.unshift(event);emit('alert',event);sent++;
+          try{await deliver(event)}catch(err){state.stats.lastError='Push failed: '+err.message;}
+        }
       }
     }
     return sent;
