@@ -1,5 +1,6 @@
 import {SPORTS} from '../providers/espn.js';
-export const FOOTBALL_PLAYER={targets:'Targets',receivingYards:'Receiving yards',receptions:'Receptions',receivingTouchdowns:'Receiving TDs',fumbles:'Fumbles'};
+import {FOOTBALL_PLAYER_STATS,footballPositionGroup} from '../../public/football-stats.js';
+export const FOOTBALL_PLAYER=FOOTBALL_PLAYER_STATS;
 export const FOOTBALL_TEAM={touchdowns:'Touchdowns',fieldGoals:'Made field goals',sacks:'Sacks allowed',interceptions:'Interceptions thrown',fumbles:'Fumbles on offense',redZoneEntries:'Red-zone entries',scoringDrives:'Scoring drives',turnovers:'Turnovers'};
 export const BASKETBALL_PLAYER={points:'Points',rebounds:'Rebounds',assists:'Assists',steals:'Steals',blocks:'Blocks',threePointers:'3-pointers made',turnovers:'Turnovers'};
 export const BASKETBALL_TEAM={points:'Points scored',threePointers:'3-pointers made'};
@@ -81,19 +82,55 @@ function basketballPlay(play,watch){
   for(const [stat,re,label] of patterns){const m=re.exec(text);if(m&&playerNamed(m[1],name,true)&&!out.some(e=>e.stat===stat))add(stat,1,label);}
   return out;
 }
+function namedQuarterback(text,name){
+  const prefix=text.split(/\bpass(?:es|ed)?\b/i)[0];
+  return /\bpass(?:es|ed)?\b/i.test(text)&&playerNamed(prefix,name,true);
+}
+function namedRunner(text,name){
+  const prefix=text.split(/\b(tackled by|tackle by|stopped by|for loss by)\b/i)[0].split(/\(/)[0];
+  const rush=/(?:\brush(?:es|ed|ing)?\b|\bruns?\b|\bscrambl(?:es|ed)\b|\b(?:left|right) (?:end|guard|tackle)\b|\bup the middle\b)/i.test(prefix);
+  if(rush&&playerNamed(prefix,name,true))return true;
+  return playerNamed(prefix,name,true)&&/\b-?\d+\s*(?:yd|yards?)\s+run\b/i.test(prefix);
+}
 function footballPlay(play,watch){
-  const text=String(play.text||'');const out=[];
-  const add=(stat,delta,detail)=>{if(delta>0)out.push({stat,delta,detail,label:statCatalog(watch.sport,watch.kind)[stat]});};
+  const text=String(play.text||''),out=[];
+  const add=(stat,delta,detail)=>{
+    if(!Number.isFinite(delta)||delta===0)return;
+    out.push({stat,delta,detail,label:statCatalog(watch.sport,watch.kind)[stat]});
+  };
   if(watch.kind==='player'){
-    const isTarget=receiver(text,watch.name),isFumble=fumbler(text,watch.name);
-    if(isTarget){add('targets',1,'Pass intended for '+watch.name);
+    const group=footballPositionGroup(watch.position);
+    // Credit for defenders comes from confirmed box score changes instead of ambiguous text.
+    if(group==='DEF')return out;
+    const qb=(group==='QB'||group==='OTHER')&&namedQuarterback(text,watch.name);
+    if(qb&&!/\bno play\b/i.test(text)){
+      add('passingAttempts',1,'Pass attempt');
+      const completed=/\bpass\s+(?:complete\s+)?to\b/i.test(text)&&!/\b(incomplete|intercepted|dropped|intended for)\b/i.test(text);
+      if(completed){
+        add('completions',1,'Completed pass');
+        const yards=/\bpass\s+(?:complete\s+)?to\b.*?\bfor\s+(-?\d+)\s*(?:yds?|yards?)\b/i.exec(text);
+        if(yards)add('passingYards',Number(yards[1]),Number(yards[1])+' passing yards');
+        if(/\btouchdown\b/i.test(text))add('passingTouchdowns',1,'Passing touchdown');
+      }
+      if(/\bintercepted\b/i.test(text))add('interceptionsThrown',1,'Interception thrown');
+    }
+    const rush=['QB','RB','REC','RET','OTHER'].includes(group)&&namedRunner(text,watch.name);
+    if(rush&&!/\bno play\b/i.test(text)){
+      add('rushingAttempts',1,'Rushing attempt');
+      const yards=/\bfor\s+(-?\d+)\s*(?:yds?|yards?)\b/i.exec(text)||/(-?\d+)\s*(?:yds?|yards?)\s+run\b/i.exec(text);
+      if(yards)add('rushingYards',Number(yards[1]),Number(yards[1])+' rushing yards');
+      if(/\btouchdown\b/i.test(text))add('rushingTouchdowns',1,'Rushing touchdown');
+    }
+    if(receiver(text,watch.name)){
+      add('targets',1,'Pass intended for '+watch.name);
       if(!/\b(incomplete|intercepted|dropped|no play)\b/i.test(text)){
         add('receptions',1,'Completed pass to '+watch.name);
-        const yards=receivingYards(text,watch.name);if(yards!==0){out.push({stat:'receivingYards',delta:yards,detail:`${yards>0?'+':''}${yards} receiving yards`,label:statCatalog(watch.sport,watch.kind).receivingYards});}
+        const yards=receivingYards(text,watch.name);
+        if(yards!==0)add('receivingYards',yards,yards+' receiving yards');
         if(/\btouchdown\b/i.test(text))add('receivingTouchdowns',1,'Receiving touchdown');
       }
     }
-    if(isFumble)add('fumbles',1,'Fumble credited to '+watch.name);
+    if(fumbler(text,watch.name))add('fumbles',1,'Fumble credited to '+watch.name);
   }else if(String(play.teamId)===String(watch.teamId)){
     if(/\btouchdown\b/i.test(text))add('touchdowns',1,'Offensive-team touchdown');
     if(/\bfield goal\b/i.test(text)&&/\b(good|made)\b/i.test(text))add('fieldGoals',1,'Made field goal');
@@ -121,6 +158,7 @@ export function normalizeWatch(input){
   const name=String(input.name||'').trim().slice(0,90),teamId=String(input.teamId||''),playerId=input.kind==='player'?String(input.playerId||''):'';
   if(!name||!/^\d{1,8}$/.test(teamId))throw new Error('Choose a valid team');
   if(input.kind==='player'&&!/^\d{1,14}$/.test(playerId))throw new Error('Choose a valid player');
+  const position=input.kind==='player'?String(input.position||'').trim().toUpperCase().slice(0,10):'';
   const catalog=statCatalog(sport,input.kind),rules={};
   const original=input.rules&&typeof input.rules==='object'&&!Array.isArray(input.rules)
     ?input.rules:Object.fromEntries((Array.isArray(input.stats)?input.stats:[]).map(k=>[k,{every:true}]));
@@ -143,5 +181,5 @@ export function normalizeWatch(input){
   const periodMin=Math.min(8,Math.max(0,Number.isSafeInteger(Number(rawSmart.periodMin))?Number(rawSmart.periodMin):0));
   const maxMargin=rawSmart.maxMargin==null||rawSmart.maxMargin===''?null:Math.min(30,Math.max(0,Number(rawSmart.maxMargin)||0));
   const smart={combine,near,periodMin,maxMargin};
-  return {sport,kind:input.kind,name,teamId,playerId,gameId,rules,smart,stats:Object.keys(rules)};
+  return {sport,kind:input.kind,name,teamId,playerId,position,gameId,rules,smart,stats:Object.keys(rules)};
 }
