@@ -1,6 +1,14 @@
-# LiveStat Arena v0.7 — public-access edition
+# LiveStat Arena v0.8 — public-access edition
 
 Cinematic black/red/white sports alerts prototype. Five leagues: NFL, NBA, college football, NCAA men's basketball and NCAA women's basketball. **No private code is needed**; the app opens directly to Select Sport.
+
+## Game box scores (v0.8)
+
+From **Select Game**, tap **VIEW BOX SCORE** below any matchup. LiveStat fetches the ESPN game-summary box score and displays team comparisons plus player stat tables, with basketball and football categories matched to the feed. The two teams are switchable; you can return to selecting a player to create an alert loadout.
+
+Game box scores refresh approximately every 25 seconds while the live box-score view remains open. Pending games may have no stats, and an unofficial ESPN feed may be incomplete, delayed, or unavailable. Preview mode provides clearly labeled sample box scores.
+
+API route: `GET /api/boxscore?sport=nba&game=401766122`. There is no new external dependency. Automated tests cover parsing, missing data, markup escaping and responsive interface module syntax.
 
 ## Changes from v0.6
 
