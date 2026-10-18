@@ -1,4 +1,6 @@
-# Experimental free hosting only: idle instances sleep, storage is ephemeral.
+# Deploy a $0 demo on Render using New → Blueprint.
+# IMPORTANT: free instances sleep and have EPHEMERAL storage. Saved alerts/push
+# subscriptions are lost on restart; alerts will not be reliably instant.
 services:
   - type: web
     name: livestat-arena

@@ -9,6 +9,10 @@
     "dev": "node --watch server.js",
     "test": "node --test"
   },
-  "engines": {"node": ">=20"},
-  "dependencies": {"web-push": "^3.6.7"}
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
 }

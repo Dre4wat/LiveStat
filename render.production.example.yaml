@@ -1,0 +1,22 @@
+# Optional upgrade for persistent watches and continuously running monitoring.
+# This is a PAID deployment; Render charges for compute and persistent storage.
+services:
+  - type: web
+    name: livestat-arena
+    runtime: node
+    plan: 0.5c-512mb
+    buildCommand: npm install
+    startCommand: npm start
+    disk:
+      name: livestat-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: LIVESTAT_DATA_DIR
+        value: /var/data
+      - key: POLL_SECONDS
+        value: '12'
