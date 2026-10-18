@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import {matchPlay,statCatalog} from './events.js';
 import {SPORTS} from '../providers/espn.js';
+import {extractBoxTotals} from '../providers/intelligence.js';
 import {pruneStore,writeStore} from './store.js';
 const gameKey=(sport,id)=>`${sport}:${id}`;
 const totalKey=(game,watch,stat)=>`${game}:${watch.id}:${stat}`;
@@ -9,6 +10,7 @@ export function makeMonitor({providers,provider,state,deliver,emit=()=>{}}){
   const feeds=providers||{nfl:provider};
   state.totals||={};state.totalsAt||={};
   let games=[],lastGamesFetch=0,polling=false;
+  state.boxVerified||={};const verifyAt=new Map();
   async function fetchGames(){
     const sports=[...new Set(state.watches.map(w=>w.sport||'nfl'))];
     const results=await Promise.allSettled(sports.map(async s=>{
@@ -24,7 +26,7 @@ export function makeMonitor({providers,provider,state,deliver,emit=()=>{}}){
   function makeAlert({watch,event,game,play,category,oldTotal,total,target=null,demo=false}){
     // One alert per changed statistic per play, regardless of how large its delta is.
     // Keep the legacy -1 suffix so previously delivered alerts retain their IDs.
-    const suffix=category==='target'?`target-${target}`:`every-${play.id}-${event.stat}-1`;
+    const suffix=category==='target'?`target-${event.stat}-${target}`:`every-${play.id}-${event.stat}-1`;
     const id=demo?`demo-${crypto.randomUUID()}`:`${watch.id}:${gameKey(watch.sport||'nfl',game.id)}:${suffix}`;
     const label=category==='target'?`🎯 TARGET REACHED · ${event.label}`:event.label;
     const detail=category==='target'
@@ -108,6 +110,50 @@ export function makeMonitor({providers,provider,state,deliver,emit=()=>{}}){
     }
     return sent;
   }
+
+  async function verifyFromBox(game,watches){
+    const gk=gameKey(game.sport,game.id);
+    if(Date.now()-(verifyAt.get(gk)||0)<35000)return;
+    verifyAt.set(gk,Date.now());
+    const source=feeds[game.sport];
+    if(typeof source?.boxScore!=='function')return;
+    let box;
+    try{box=await source.boxScore(game.id);}catch{return;}
+    for(const watch of watches){
+      const stats=extractBoxTotals(box,watch);
+      for(const [stat,rule] of Object.entries(watch.rules||{})){
+        if(!Object.hasOwn(stats,stat))continue;
+        const current=stats[stat],key=totalKey(gk,watch,stat);
+        if(!Number.isFinite(current))continue;
+        const old=state.boxVerified[key];
+        state.boxVerified[key]=current;
+        if(old==null)continue; // Never backfill earlier events as live notifications.
+        if(rule.target!=null&&old<rule.target&&current>=rule.target){
+          const event={stat,label:statCatalog(watch.sport,watch.kind)[stat]||stat,delta:current-old,detail:'Confirmed box-score milestone'};
+          const play={id:'box-confirmed-'+game.id,text:'ESPN box score confirmed a milestone',period:'?',clock:''};
+          const alert=makeAlert({watch,event,game,play,category:'target',oldTotal:old,total:current,target:rule.target});
+          if(!state.notified[alert.id]){
+            state.notified[alert.id]=Date.now();
+            alert.detail='ESPN box score confirms '+current+' '+event.label.toLowerCase()+' (target '+rule.target+')';
+            state.alerts.unshift(alert);emit('alert',alert);
+            try{await deliver(alert);}catch(err){state.stats.lastError='Push failed: '+err.message;}
+          }
+        }
+        if(current<old&&rule.every){
+          const id=watch.id+':'+gk+':correction:'+stat+':'+old+':'+current;
+          if(!state.notified[id]){
+            state.notified[id]=Date.now();
+            const alert={id,watchId:watch.id,sport:watch.sport,kind:watch.kind,name:watch.name,category:'correction',
+              stat,label:'STAT CORRECTION · '+stat,detail:'Box score revised '+old+' → '+current,game:game.name,
+              delta:current-old,oldTotal:old,total:current,time:new Date().toISOString(),demo:false};
+            state.alerts.unshift(alert);emit('alert',alert);
+            try{await deliver(alert);}catch(err){state.stats.lastError='Push failed: '+err.message;}
+          }
+        }
+      }
+    }
+  }
+
   function seedTotals(watch,game,plays){
     const prefix=gameKey(watch.sport||'nfl',game.id);
     const catalog=statCatalog(watch.sport||'nfl',watch.kind);
@@ -148,6 +194,7 @@ export function makeMonitor({providers,provider,state,deliver,emit=()=>{}}){
               await deliverEvents(watch,game,{...play,opponentAbbr:opposing?.abbr||''});
             }
           }
+          await verifyFromBox(game,watches);
           prior.at=Date.now();state.totalsAt[gk]=Date.now();
         }catch(err){state.stats.lastError=`${game.sport} ${game.name}: ${err.message}`;}
       }
