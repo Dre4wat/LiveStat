@@ -50,6 +50,11 @@ export function makeMonitor({providers,provider,state,deliver,emit=()=>{}}){
     for(const event of changes.values()){
       const rule=configFor(watch,event.stat);
       if(!rule||event.delta===0)continue;
+      if(event.stat==='redZoneEntries'&&play.driveId){
+        const zoneKey=watch.id+':'+gk+':redzone-drive:'+play.driveId;
+        if(!demo&&state.notified[zoneKey])continue;
+        if(!demo)state.notified[zoneKey]=Date.now();
+      }
       const tk=totalKey(gk,watch,event.stat),old=totals[tk]||0,next=old+event.delta;
       totals[tk]=next;
       const alerts=[];
@@ -138,7 +143,10 @@ export function makeMonitor({providers,provider,state,deliver,emit=()=>{}}){
           for(const play of plays){
             if(ids.has(String(play.id)))continue;
             ids.add(String(play.id));prior.ids.push(String(play.id));
-            for(const watch of watches)await deliverEvents(watch,game,play);
+            for(const watch of watches){
+              const opposing=game.teams.find(t=>String(t.id)!==String(watch.teamId));
+              await deliverEvents(watch,game,{...play,opponentAbbr:opposing?.abbr||''});
+            }
           }
           prior.at=Date.now();state.totalsAt[gk]=Date.now();
         }catch(err){state.stats.lastError=`${game.sport} ${game.name}: ${err.message}`;}
