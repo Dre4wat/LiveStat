@@ -100,3 +100,8 @@
 .ls-smart-grid select{display:block;max-width:100%;min-width:0;background:#1b1117;color:#fff;border:1px solid #7a3c47;padding:10px;border-radius:7px;font-size:12px}
 .ls-smart-builder>p{color:#c49aa3;font-size:11px;line-height:1.5;margin:14px 0 0}
 @media(max-width:540px){.ls-smart-grid{grid-template-columns:1fr}}
+
+.ls-i-timeline h3{font-size:11px;letter-spacing:1.1px;color:#ed7c8d;margin:17px 0 2px;border-bottom:1px solid #56323b;padding:4px 0}
+.ls-i-timeline button.watched{border-left-color:#ffce72;background:#3c231c}
+.ls-i-replay{background:#ac2337;color:white;border:1px solid #f44b5d;border-radius:8px;padding:10px 14px;font-weight:800;font-size:12px;margin:0 0 15px}
+@media(max-width:900px){.mobile-nav{grid-template-columns:repeat(5,1fr)!important}.mobile-nav-item small{font-size:9px!important}}
