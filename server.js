@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {espnProviders,SPORTS} from './src/providers/espn.js';
+import {extractBoxTotals} from './src/providers/intelligence.js';
 import {makeMonitor} from './src/engine/monitor.js';
 import {normalizeWatch} from './src/engine/events.js';
 import {loadStore,writeStore} from './src/engine/store.js';
@@ -42,6 +43,25 @@ function allowWrite(req){
 }
 const teamCache=new Map(),rosterCache=new Map();
 const boxScoreCache=new Map(); // Refresh live box scores frequently without flooding ESPN.
+const insightCache=new Map();
+async function cached(key,ttl,fn){
+ const previous=insightCache.get(key),now=Date.now();
+ if(previous&&now-previous.at<ttl)return previous.data;
+ const data=await fn();insightCache.set(key,{at:now,data});
+ if(insightCache.size>140)insightCache.delete(insightCache.keys().next().value);
+ return data;
+}
+function providerFrom(url){
+ const sport=url.searchParams.get('sport')||'nba';
+ if(!espnProviders[sport])throw new Error('Unknown league');
+ return {sport,provider:espnProviders[sport]};
+}
+function safeGame(url){
+ const game=url.searchParams.get('game')||'';
+ if(!/^[0-9]{6,14}$/.test(game))throw new Error('Invalid game');
+ return game;
+}
+
 
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
 const send=(res,status,body)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body));};
@@ -101,6 +121,49 @@ async function handle(req,res){
       boxScoreCache.set(key,{at:now,ttl,data});
       if(boxScoreCache.size>150){const old=boxScoreCache.keys().next().value;boxScoreCache.delete(old);}
       return send(res,200,{boxscore:data});
+    }
+    if(req.method==='GET'&&route==='/api/intelligence'){
+      const {sport,provider}=providerFrom(url),game=safeGame(url);
+      const data=await cached('intel:'+sport+':'+game,18000,()=>provider.intelligence(game));
+      return send(res,200,{insights:data});
+    }
+    if(req.method==='GET'&&route==='/api/profile'){
+      const {sport,provider}=providerFrom(url),athlete=url.searchParams.get('athlete')||'';
+      if(!/^[0-9]{1,14}$/.test(athlete))throw new Error('Invalid athlete');
+      const data=await cached('profile:'+sport+':'+athlete,300000,()=>provider.playerProfile(athlete));
+      return send(res,200,{profile:data});
+    }
+    if(req.method==='GET'&&route==='/api/league'){
+      const {sport,provider}=providerFrom(url),section=url.searchParams.get('section');
+      if(!['standings','injuries'].includes(section))throw new Error('Invalid league section');
+      const data=await cached('league:'+section+':'+sport,180000,()=>provider[section]());
+      return send(res,200,{league:data});
+    }
+    if(req.method==='GET'&&route==='/api/tracker'){
+      const watches=state.watches.filter(w=>w.ownerId===ownerId).slice(0,40);
+      const limit=10,selected=[...new Set(watches.filter(w=>w.gameId).map(w=>w.sport+':'+w.gameId))].slice(0,limit);
+      const boxes=new Map();
+      await Promise.all(selected.map(async key=>{
+        const [sport,game]=key.split(':');
+        try{boxes.set(key,await cached('box:'+key,18000,()=>espnProviders[sport].boxScore(game)));}
+        catch(err){boxes.set(key,{error:err.message});}
+      }));
+      const tracker=watches.map(w=>{
+        const box=boxes.get(w.sport+':'+w.gameId);
+        const current=box&&!box.error?extractBoxTotals(box,w):{};
+        const entries=Object.entries(w.rules||{}).map(([stat,rule])=>{
+          const val=Object.hasOwn(current,stat)?current[stat]:null;
+          return {stat,current:val,target:rule.target??null,
+            complete:val!=null&&rule.target!=null&&val>=rule.target,
+            dataAvailable:val!=null};
+        });
+        const goals=entries.filter(x=>x.target!=null),done=goals.filter(x=>x.complete).length;
+        return {id:w.id,sport:w.sport,name:w.name,kind:w.kind,gameId:w.gameId,teamId:w.teamId,
+          rules:w.rules,stats:entries,goals:{done,total:goals.length,complete:goals.length>0&&done===goals.length},
+          source:box?.error?'Unavailable':box?'ESPN box score':'No game box score',error:box?.error||null,
+          game:box?{teams:box.teams,status:box.status,state:box.state}:null};
+      });
+      return send(res,200,{tracker,updatedAt:new Date().toISOString()});
     }
     if(req.method==='POST'&&route==='/api/watches'){
       const watch=normalizeWatch(await body(req));
