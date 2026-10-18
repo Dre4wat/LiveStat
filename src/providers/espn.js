@@ -31,7 +31,7 @@ function normalizePlay(p,gameId){
     gameId:String(gameId),text:p.text||p.shortText||'',teamId:String(p.team?.id||''),
     period:p.period?.number||'?',clock:p.clock?.displayValue||'',participants:p.participants||p.athletes||[],
     rawType:p.type?.text||p.type?.abbreviation||'',scoringPlay:Boolean(p.scoringPlay),
-    scoreValue:Number(p.scoreValue||0),homeScore:p.homeScore==null?null:Number(p.homeScore),awayScore:p.awayScore==null?null:Number(p.awayScore),timestamp:p.wallclock||null};
+    scoreValue:Number(p.scoreValue||0),driveId:String(p._driveId||''),homeScore:p.homeScore==null?null:Number(p.homeScore),awayScore:p.awayScore==null?null:Number(p.awayScore),timestamp:p.wallclock||null};
 }
 export function espnProviderFor(sport){
  if(!SPORTS[sport])throw new Error('Unknown sport');
@@ -94,7 +94,7 @@ export function espnProviderFor(sport){
     if(!/^\d{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
     const d=await getJson(sport,`/summary?event=${gameId}`);
     const entries=SPORTS[sport].ball==='football'
-      ? [...(d.drives?.previous||[]),...(d.drives?.current?[d.drives.current]:[])].flatMap(x=>x.plays||[])
+      ? [...(d.drives?.previous||[]),...(d.drives?.current?[d.drives.current]:[])].flatMap((drive,i)=>(drive.plays||[]).map(p=>({...p,_driveId:String(drive.id||'drive-'+i)})))
       : Array.isArray(d.plays)?d.plays:[];
     const unique=new Map();for(const p of entries){const n=normalizePlay(p,gameId);unique.set(n.id,n)}
     return [...unique.values()];
