@@ -9,7 +9,7 @@
   <meta name="description" content="LiveStat Arena — game-first NFL, NBA and college sports stat alerts." />
   <title>LiveStat // Arena</title>
   <link rel="manifest" href="/manifest.json" /><link rel="apple-touch-icon" href="/icon-192.png" />
-  <link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/cinematic.css" /><link rel="stylesheet" href="/boxscore.css" />
+  <link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/cinematic.css" /><link rel="stylesheet" href="/boxscore.css" /><link rel="stylesheet" href="/intelligence.css" />
 </head>
 <body>
   <div class="shell">
@@ -19,10 +19,12 @@
       <button class="side-item is-active" data-action="nav" data-tab="arena"><span class="side-icon">⌂</span> Game Center <span class="side-arrow">↗</span></button>
       <button class="side-item" data-action="nav" data-tab="watches"><span class="side-icon">◎</span> My Alerts <span class="side-badge" id="side-watch-count">0</span></button>
       <button class="side-item" data-action="nav" data-tab="activity"><span class="side-icon">▥</span> Live Activity</button>
+      <button class="side-item" data-action="nav" data-tab="command"><span class="side-icon">▣</span> Command Center</button>
+      <button class="side-item" data-action="nav" data-tab="league"><span class="side-icon">▤</span> League Center</button>
       <button class="side-item" data-action="nav" data-tab="settings"><span class="side-icon">⚙</span> Settings</button>
       <div class="side-spacer"></div>
       <div class="side-card"><span class="status-beam"></span><small>THE CONTROL ROOM</small><strong>Your players.<br/>Your moments.</strong><span>One alert per play. Milestones when they matter.</span></div>
-      <div class="side-foot">LIVESTAT / V0.7 <span>● FREE DATA</span></div>
+      <div class="side-foot">LIVESTAT / V0.9 <span>● FREE DATA</span></div>
     </aside>
     <div class="main-shell">
       <header class="top-bar">
@@ -38,6 +40,7 @@
     <button class="mobile-nav-item active" data-action="nav" data-tab="arena"><span>◈</span><small>Home</small></button>
     <button class="mobile-nav-item" data-action="nav" data-tab="watches"><span>◎</span><small>Alerts</small></button>
     <button class="mobile-nav-item" data-action="nav" data-tab="activity"><span>▥</span><small>Activity</small></button>
+    <button class="mobile-nav-item" data-action="nav" data-tab="command"><span>▣</span><small>Command</small></button>
     <button class="mobile-nav-item" data-action="nav" data-tab="settings"><span>⚙</span><small>Settings</small></button>
   </nav>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
