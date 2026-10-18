@@ -1,3 +1,4 @@
+import {espnProviders} from '../src/providers/espn.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeBoxScore} from '../src/providers/boxscore.js';
@@ -61,4 +62,8 @@ test('untrusted athlete and stat strings are escaped',()=>{
  const html=boxscoreMarkup({game:{state:'in'},boxscore:x,sport:'nba'});
  assert.doesNotMatch(html,/<img src=x/);
  assert.match(html,/&lt;img src=x/);
+});
+
+test('each league exposes a box-score data provider',()=>{
+ for(const sport of ['nfl','cfb','nba','ncaam','ncaaw'])assert.equal(typeof espnProviders[sport]?.boxScore,'function');
 });
