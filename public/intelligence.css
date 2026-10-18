@@ -90,3 +90,13 @@
 .ls-i-tabs button{padding:10px}
 .ls-i-chart{height:160px}
 }
+
+.ls-smart-builder{margin:15px 0 18px;border:1px solid #7f3843;border-radius:12px;padding:16px;background:linear-gradient(145deg,#2e151d,#1a1116)}
+.ls-smart-title{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.ls-smart-title strong{color:#fff;font-weight:900;font-size:14px;letter-spacing:.5px}
+.ls-smart-title small{color:#f97b89;font-size:10px;letter-spacing:.6px}
+.ls-smart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ls-smart-grid label{display:flex;flex-direction:column;gap:7px;color:#e1bdc4;font-size:11px;font-weight:800}
+.ls-smart-grid select{display:block;max-width:100%;min-width:0;background:#1b1117;color:#fff;border:1px solid #7a3c47;padding:10px;border-radius:7px;font-size:12px}
+.ls-smart-builder>p{color:#c49aa3;font-size:11px;line-height:1.5;margin:14px 0 0}
+@media(max-width:540px){.ls-smart-grid{grid-template-columns:1fr}}
