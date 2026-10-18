@@ -126,7 +126,7 @@ function footballPlay(play,watch){
       if(!/\b(incomplete|intercepted|dropped|no play)\b/i.test(text)){
         add('receptions',1,'Completed pass to '+watch.name);
         const yards=receivingYards(text,watch.name);
-        if(yards!==0)add('receivingYards',yards,yards+' receiving yards');
+        if(yards!==0)add('receivingYards',yards,(yards>0?'+':'')+yards+' receiving yards');
         if(/\btouchdown\b/i.test(text))add('receivingTouchdowns',1,'Receiving touchdown');
       }
     }
