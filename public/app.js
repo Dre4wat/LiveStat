@@ -15,7 +15,7 @@ const demoPlayers={'13':[{id:'1966',name:'LeBron James',position:'F',teamId:'13'
 const previewMode=new URLSearchParams(location.search).get('preview')==='1';
 const s={boxscoreGame:null,boxscoreData:null,boxscoreLoading:false,boxscoreError:'',boxscoreTeam:null,preview:previewMode,authorized:true,tab:'arena',step:0,sport:null,game:null,gameDate:new Date(),filter:'all',team:null,roster:[],player:null,kind:'player',rules:{},smart:{combine:'off',near:0,periodMin:0,maxMargin:null},watchList:[],alerts:[],config:null,loading:false,error:'',search:''};
 const app=$('#app');let toastTimer;
-const intelligence=createInsights({api,escape:esc,refresh:()=>{if(['insights','command','league'].includes(s.tab))render()}});
+const intelligence=createInsights({api,escape:esc,refresh:()=>{if(['insights','command','league'].includes(s.tab))render()},getWatches:()=>s.watchList,getAlerts:()=>s.alerts});
 function toast(msg){const e=$('#toast');e.textContent=msg;e.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.classList.remove('show'),3700)}
 const isBB=()=>['nba','ncaam','ncaaw'].includes(s.sport);
 const configuredStats=()=>options[(isBB()?'bb':'fb')+(s.kind==='team'?'Team':'Player')];
@@ -136,6 +136,7 @@ if(a==='intel-open'){
  if(!w)return;
  s.tab='insights';intelligence.openGame(w.sport,{id:w.gameId,name:w.name+' Game',status:w.game?.status,teams:w.game?.teams});render();return;
 }
+if(a==='intel-leagueopen'){s.tab='league';intelligence.openLeague(s.sport||'nba');render();return}
 if(a==='intel-back'){s.tab='arena';render();return}
 if(a==='nav')return setTab(b.dataset.tab);if(a==='sport')return selectSport(b.dataset.sport);if(a==='filter'){s.filter=b.dataset.filter;return render()}if(a==='date'){s.gameDate.setDate(s.gameDate.getDate()+Number(b.dataset.days));return gamesLoad()}if(a==='game')return selectGame(b.dataset.game);if(a==='boxscore')return openBoxScore(b.dataset.game);if(a==='boxclose')return closeBoxScore();if(a==='boxrefresh')return refreshBoxScore();if(a==='boxtrack')return trackFromBoxScore();if(a==='boxteam'){s.boxscoreTeam=b.dataset.team;return render()}if(a==='team'){s.team=gameTeams().find(t=>t.id===b.dataset.team);s.search='';return loadRoster()}if(a==='player')return setPlayer(b.dataset.player);if(a==='trackteam')return trackTeam();if(a==='save')return save();if(a==='step'){const i=Number(b.dataset.step);if(i<=s.step){s.step=i;render()};return}if(a==='new'){s.sport=null;s.step=0;return setTab('arena')}if(a==='delete')return deleteWatch(b.dataset.id);if(a==='demoalert')return simulate(b.dataset.id);if(a==='sample'){if(s.preview)return sampleAlerts();try{await api('/api/sample','POST',{sport:'nba'});await loadStatus();render()}catch(err){toast(err.message)}return}if(a==='push')return push();if(a==='testpush')return testPush();if(a==='preview'){location.href='/?preview=1';return}});
 app.addEventListener('input',e=>{if(intelligence.input(e.target))return;if(e.target.matches('[data-smart]')){const k=e.target.dataset.smart,v=e.target.value;s.smart[k]=k==='combine'?v:k==='maxMargin'?(v===''?null:Number(v)):Number(v);return;}if(e.target.id==='player-search'){s.search=e.target.value;const grid=$('#roster-grid');if(grid)grid.innerHTML=rosterCards()}if(e.target.matches('[data-rule-every]')){const k=e.target.dataset.ruleEvery;s.rules[k]||={every:false,target:null};s.rules[k].every=e.target.checked}if(e.target.matches('[data-rule-target]')){const k=e.target.dataset.ruleTarget;s.rules[k]||={every:false,target:null};const v=e.target.value.trim();s.rules[k].target=v?Math.max(1,Math.floor(Number(v))):null}});
@@ -147,4 +148,5 @@ async function boot(){
   if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
   setInterval(async()=>{await loadStatus();if(s.tab==='watches'||s.tab==='activity')render()},7000)
   setInterval(()=>{if(s.tab==='arena'&&s.boxscoreGame&&s.boxscoreGame.state==='in'&&!document.hidden)refreshBoxScore()},25000);
+  setInterval(()=>{if(!document.hidden&&['insights','command'].includes(s.tab)&&!intelligence.state.loading)intelligence.reload()},25000);
 }boot();
