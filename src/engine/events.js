@@ -129,5 +129,12 @@ export function normalizeWatch(input){
   if(!Object.keys(rules).length)throw new Error('Select at least one statistic and alert method');
   const gameId=String(input?.gameId||'');
   if(gameId&&!/^\d{6,14}$/.test(gameId))throw new Error('Invalid game selection');
-  return {sport,kind:input.kind,name,teamId,playerId,gameId,rules,stats:Object.keys(rules)};
+
+  const rawSmart=input.smart&&typeof input.smart==='object'&&!Array.isArray(input.smart)?input.smart:{};
+  const combine=['all','any'].includes(rawSmart.combine)?rawSmart.combine:'off';
+  const near=Math.min(20,Math.max(0,Number.isSafeInteger(Number(rawSmart.near))?Number(rawSmart.near):0));
+  const periodMin=Math.min(8,Math.max(0,Number.isSafeInteger(Number(rawSmart.periodMin))?Number(rawSmart.periodMin):0));
+  const maxMargin=rawSmart.maxMargin==null||rawSmart.maxMargin===''?null:Math.min(30,Math.max(0,Number(rawSmart.maxMargin)||0));
+  const smart={combine,near,periodMin,maxMargin};
+  return {sport,kind:input.kind,name,teamId,playerId,gameId,rules,smart,stats:Object.keys(rules)};
 }
