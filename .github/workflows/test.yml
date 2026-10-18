@@ -13,4 +13,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
+      - run: node --check server.js
+      - run: node --check public/app.js
+      - run: node --check src/providers/espn.js
       - run: npm test
