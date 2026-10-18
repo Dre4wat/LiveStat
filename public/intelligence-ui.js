@@ -1,7 +1,8 @@
 export function createInsights({api,escape,refresh,getWatches=()=>[],getAlerts=()=>[]}) {
   const esc=escape;
   const state={kind:'game',sport:'nba',game:null,details:null,loading:false,error:'',tab:'overview',selected:null,
-    tracker:null,profiles:null,league:null,leagueSection:'standings',profile:null,profileData:null,compare:[]};
+    tracker:null,profiles:null,league:null,leagueSection:'standings',profile:null,profileData:null,compare:[],pinned:[]};
+  try{if(typeof localStorage!=='undefined')state.pinned=JSON.parse(localStorage.getItem('livestat-pinned')||'[]')}catch{state.pinned=[]}
   const names={nfl:'NFL',cfb:'College Football',nba:'NBA',ncaam:"Men's College Basketball",ncaaw:"Women's College Basketball"};
   const statNames={points:'PTS',rebounds:'REB',assists:'AST',steals:'STL',blocks:'BLK',threePointers:'3PM',turnovers:'TO',receptions:'REC',receivingYards:'REC YDS',targets:'TGTS',fumbles:'FUM',touchdowns:'TD',fieldGoals:'FG',sacks:'SACK'};
   const sportName=()=>names[state.sport]||state.sport;
@@ -23,12 +24,12 @@ export function createInsights({api,escape,refresh,getWatches=()=>[],getAlerts=(
     const goals=w.goals||{done:0,total:0};
     return `<article class="ls-i-card"><div class="ls-i-card-head"><strong>${esc(w.name)}</strong><span>${esc(names[w.sport]||w.sport)} · ${esc(w.source||'')}</span></div><p class="ls-i-muted">${esc(w.game?.status||'Game '+w.gameId)}${w.game?.teams?.length?' · '+esc(w.game.teams.map(t=>(t.abbr||t.name)+' '+(t.score||'')).join(' vs ')):''}</p>
       ${(w.stats||[]).map(m=>`<div class="ls-i-progress"><div><b>${esc(statNames[m.stat]||m.stat)}</b><span>${m.current==null?'N/A':esc(m.current)}${m.target!=null?' / '+esc(m.target):''} ${m.complete?'✓':''}</span></div><div class="ls-i-track"><i style="width:${m.target!=null&&m.current!=null?Math.min(100,Math.max(0,m.current/m.target*100)):0}%"></i></div></div>`).join('')}
-      <div class="ls-i-controls"><span class="ls-i-chip">${goals.done}/${goals.total} TARGETS</span>${goals.total>0&&goals.complete?'<span class="ls-i-chip success">MISSION COMPLETE</span>':''}<button data-action="intel-open" data-sport="${esc(w.sport)}" data-game="${esc(w.gameId)}">OPEN GAME ↗</button></div></article>`;
+      <div class="ls-i-controls"><span class="ls-i-chip">${goals.done}/${goals.total} TARGETS</span><button data-action="intel-pin" data-watch="${esc(w.id)}">${state.pinned.includes(w.id)?'★ PINNED':'☆ PIN GAME'}</button>${goals.total>0&&goals.complete?'<span class="ls-i-chip success">MISSION COMPLETE</span>':''}<button data-action="intel-open" data-sport="${esc(w.sport)}" data-game="${esc(w.gameId)}">OPEN GAME ↗</button></div></article>`;
   }
   function commandView(){
     if(state.loading&&!state.tracker)return notice('Loading saved players and game statistics…');
     if(state.error&&!state.tracker)return notice('Player tracker: '+state.error);
-    const watches=state.tracker?.tracker||[];
+    const watches=(state.tracker?.tracker||[]).slice().sort((a,b)=>Number(state.pinned.includes(b.id))-Number(state.pinned.includes(a.id)));
     return `<div class="ls-i-title"><span>YOUR MULTI-GAME OPERATIONS HUB</span><h1>COMMAND <em>CENTER</em></h1><p>Live player goals, mission progress, and comparisons. Numbers are only shown when ESPN provides them.</p></div>
       <div class="ls-i-actions"><button data-action="intel-reload">↻ UPDATE TRACKER</button><button data-action="intel-leagueopen">LEAGUE STANDINGS / INJURIES ↗</button><span>${watches.length} SAVED PLAYERS & TEAMS</span></div>
       ${watches.length?`<div class="ls-i-grid">${watches.map(trackerCard).join('')}</div>`:notice('No saved alerts yet. Choose a game, select a player, and save an alert loadout first.')}
@@ -169,6 +170,12 @@ export function createInsights({api,escape,refresh,getWatches=()=>[],getAlerts=(
       const summary=[(state.game?.name||'Game')+' — LiveStat Replay',...((d.scoring||[]).map(p=>'Q'+p.period+' '+p.clock+' '+p.text))].join('\n');
       if(typeof navigator!=='undefined'&&navigator.clipboard?.writeText)navigator.clipboard.writeText(summary).catch(()=>{});
       return true;
+    }
+    if(action==='intel-pin'){
+      const id=node.dataset.watch;
+      state.pinned=state.pinned.includes(id)?state.pinned.filter(x=>x!==id):[...state.pinned,id];
+      try{if(typeof localStorage!=='undefined')localStorage.setItem('livestat-pinned',JSON.stringify(state.pinned))}catch{}
+      refresh();return true;
     }
     if(action==='intel-tab'){state.tab=node.dataset.value;state.selected=null;refresh();return true}
     if(action==='intel-play'){state.selected=node.dataset.play;refresh();return true}
