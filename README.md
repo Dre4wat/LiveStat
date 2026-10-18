@@ -1,3 +1,5 @@
+> **Repository import status:** The full v0.7 project has not been transferred into this GitHub repository yet. It currently contains setup and selected source files, but is **not runnable from GitHub as-is**. The complete v0.7 project archive is available in the ChatGPT conversation. To complete an import, extract that archive and push its contents to this repository. No private code is required by the full v0.7 app.
+
 # LiveStat Arena v0.7 — public-access edition
 
 Cinematic black/red/white sports alerts prototype. Five leagues: NFL, NBA, college football, NCAA men's basketball and NCAA women's basketball. **No private code is needed**; the app opens directly to Select Sport.
