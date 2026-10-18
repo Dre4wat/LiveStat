@@ -41,6 +41,8 @@ function allowWrite(req){
   try{return new URL(origin).host===req.headers.host;}catch{return false;}
 }
 const teamCache=new Map(),rosterCache=new Map();
+const boxScoreCache=new Map(); // Refresh live box scores frequently without flooding ESPN.
+
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.png':'image/png','.svg':'image/svg+xml'};
 const send=(res,status,body)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(body));};
 
@@ -87,6 +89,18 @@ async function handle(req,res){
       if(!espnProviders[sport])throw new Error('Invalid league');
       if(date&&!/^\d{8}$/.test(date))throw new Error('Invalid date');
       return send(res,200,{games:await espnProviders[sport].games({date})});
+    }
+    if(req.method==='GET'&&route==='/api/boxscore'){
+      const sport=url.searchParams.get('sport')||'nfl',game=url.searchParams.get('game')||'';
+      if(!espnProviders[sport]||!/^[0-9]{6,14}$/.test(game))throw new Error('Invalid league or game');
+      const key=sport+':'+game,now=Date.now();
+      const cached=boxScoreCache.get(key);
+      if(cached && now-cached.at<cached.ttl)return send(res,200,{boxscore:cached.data});
+      const data=await espnProviders[sport].boxScore(game);
+      const ttl=data.state==='in'?12000:data.state==='post'?120000:30000;
+      boxScoreCache.set(key,{at:now,ttl,data});
+      if(boxScoreCache.size>150){const old=boxScoreCache.keys().next().value;boxScoreCache.delete(old);}
+      return send(res,200,{boxscore:data});
     }
     if(req.method==='POST'&&route==='/api/watches'){
       const watch=normalizeWatch(await body(req));
