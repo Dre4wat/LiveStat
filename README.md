@@ -2,6 +2,19 @@
 
 Cinematic black/red/white sports alerts prototype. Five leagues: NFL, NBA, college football, NCAA men's basketball and NCAA women's basketball. **No private code is needed**; the app opens directly to Select Sport.
 
+## Position-first player selection (v1.1)
+
+When picking a player for an NFL, college-football, NBA, or college-basketball game:
+
+1. Choose the team.
+2. Select a **position group** (e.g. QB, RB, WR, TE, defensive line, linebackers, cornerbacks, safeties; or basketball guards, forwards, centers).
+3. Players within that group appear in priority order based on **published ESPN depth charts**, followed by **team statistical leaders** and **selected-game starters/performance** when supplied.
+4. Choose a player and configure tracking alerts.
+
+The search bar searches across the roster even before a group is chosen; the **View All Players** fallback remains available. Switching teams resets position selection. Badges such as `#1 DEPTH CHART` or `TEAM STAT LEADER` are only shown when ranking metadata exists.
+
+Data is best-effort from ESPN's unofficial public feeds. College depth charts and some team leader reports may not be available. When none of those rankings are available, players fall back to alphabetical order rather than an invented starter ranking. Roster rank information is refreshed periodically.
+
 ## Football player stat tracker — position-aware
 
 The NFL and College Football player loadouts no longer assume every athlete is a receiver. When you select a player, their ESPN roster position determines the default stat menu:
