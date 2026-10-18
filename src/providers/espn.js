@@ -59,7 +59,7 @@ export function espnProviderFor(sport){
     });
   },
   async boxScore(gameId){
-    if(!/^\\d{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
+    if(!/^[0-9]{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
     const summary=await getJson(sport,'/summary?event='+gameId);
     return normalizeBoxScore(sport,gameId,summary);
   },
