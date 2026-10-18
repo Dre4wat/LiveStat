@@ -58,6 +58,7 @@ export function createInsights({api,escape,refresh,getWatches=()=>[],getAlerts=(
       ['LEAD CHANGES',mm.leadChanges],['BIGGEST HOME LEAD',mm.biggestHomeLead],['BIGGEST AWAY LEAD',mm.biggestAwayLead],['SCORING PLAYS',d.scoring?.length]
     ].map(([k,v])=>`<article class="ls-i-metric"><small>${k}</small><strong>${v??'—'}</strong></article>`).join('')}</div>
       <section class="ls-i-panel"><h2>SCORING BY PERIOD</h2>${statRows((d.periods||[]).map(p=>['Q'+p.period,p.away+' – '+p.home]))}${!d.periods?.length?notice('Per-period scoring data is unavailable for this game.'):''}</section>
+      ${(d.watchPeriods||[]).length?`<section class="ls-i-panel"><h2>TRACKED PLAYER QUARTER SPLITS</h2><p class="ls-i-muted">Best-effort totals derived from recognized play descriptions, not official period box scores.</p>${d.watchPeriods.map(w=>`<h3>${esc(w.name)}</h3>${Object.entries(w.periods||{}).map(([quarter,stats])=>`<div class="ls-i-standing"><strong>Q${esc(quarter)}</strong><span>${esc(Object.entries(stats).map(([k,v])=>v+' '+(statNames[k]||k)).join(' · ')||'No tracked events')}</span></div>`).join('')}`).join('')}</section>`:''}
       ${timeline((d.plays||[]).slice(-12),'RECENT GAME EVENTS')}`;
   }
   function momentumView(){
