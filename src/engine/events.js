@@ -1,6 +1,6 @@
 import {SPORTS} from '../providers/espn.js';
 export const FOOTBALL_PLAYER={targets:'Targets',receivingYards:'Receiving yards',receptions:'Receptions',receivingTouchdowns:'Receiving TDs',fumbles:'Fumbles'};
-export const FOOTBALL_TEAM={touchdowns:'Touchdowns',fieldGoals:'Made field goals',sacks:'Sacks allowed',interceptions:'Interceptions thrown',fumbles:'Fumbles on offense'};
+export const FOOTBALL_TEAM={touchdowns:'Touchdowns',fieldGoals:'Made field goals',sacks:'Sacks allowed',interceptions:'Interceptions thrown',fumbles:'Fumbles on offense',redZoneEntries:'Red-zone entries',scoringDrives:'Scoring drives',turnovers:'Turnovers'};
 export const BASKETBALL_PLAYER={points:'Points',rebounds:'Rebounds',assists:'Assists',steals:'Steals',blocks:'Blocks',threePointers:'3-pointers made',turnovers:'Turnovers'};
 export const BASKETBALL_TEAM={points:'Points scored',threePointers:'3-pointers made'};
 export function statCatalog(sport,kind){return (SPORTS[sport]?.ball==='basketball')
@@ -100,6 +100,13 @@ function footballPlay(play,watch){
     if(/\bsacked\b/i.test(text))add('sacks',1,'Sack allowed');
     if(/\bintercepted\b/i.test(text))add('interceptions',1,'Interception thrown');
     if(/\bfumbles?\b/i.test(text))add('fumbles',1,'Fumble on offensive play');
+    const opp=String(play.opponentAbbr||'').replace(/[^A-Z]/gi,'');
+    if(opp.length>=2&&play.driveId){
+      const m=new RegExp('\\bat\\s+'+opp+'\\s+(\\d{1,2})\\b','i').exec(text);
+      if(m&&Number(m[1])<=20&&Number(m[1])>0)add('redZoneEntries',1,'Offense reached the opposing red zone');
+    }
+    if(play.scoringPlay&&/\\btouchdown\\b|\\bfield goal\\b.*\\b(good|made)\\b/i.test(text))add('scoringDrives',1,'Scoring drive');
+    if(/\\bintercepted\\b/i.test(text)||(/\\bfumbles?\\b/i.test(text)&&/\\brecovered by\\b/i.test(text)))add('turnovers',1,'Turnover on offensive possession');
   }
   return out;
 }
