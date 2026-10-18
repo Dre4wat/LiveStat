@@ -24,7 +24,7 @@ export function normalizeIntelligence(sport,gameId,raw){
       teamId:txt(p.team?.id),homeScore:number(p.homeScore),awayScore:number(p.awayScore),
       scoring:Boolean(p.scoringPlay||scoreValue>0),scoreValue,
       shooting:Boolean(p.shootingPlay),coordinate:x!=null&&y!=null?{x,y}:null,
-      made:/\\b(makes|made|good)\\b/i.test(txt(p.text))&&!/\\bmiss/i.test(txt(p.text))
+      made:/\b(makes|made|good)\b/i.test(txt(p.text))&&!/\bmiss/i.test(txt(p.text))
     };
   }).filter(p=>{if(seen.has(p.id))return false;seen.add(p.id);return true;});
   const scoring = plays.filter(p=>p.scoring || (p.homeScore!=null&&p.awayScore!=null&&(p.scoreValue>0)));
@@ -45,7 +45,7 @@ export function normalizeIntelligence(sport,gameId,raw){
   }
   const probabilities=arr(d.winprobability).map(p=>({playId:txt(p.playId),home:number(p.homeWinPercentage),tie:number(p.tiePercentage)}))
     .filter(p=>p.home!=null&&p.home>=0&&p.home<=1);
-  const shots=plays.filter(p=>p.coordinate&&(p.shooting||/\\b(shot|jumper|layup|dunk|hook|three point|3-pt)\\b/i.test(p.text)))
+  const shots=plays.filter(p=>p.coordinate&&(p.shooting||/\b(shot|jumper|layup|dunk|hook|three point|3-pt)\b/i.test(p.text)))
     .map(p=>({...p,made:p.made || Boolean(p.scoreValue)}));
   const drives=rawDrives.map((drive,i)=>{
     const pp=arr(drive.plays);
