@@ -1,5 +1,6 @@
 // Best-effort, UNOFFICIAL public ESPN endpoints. Never promise realtime accuracy.
 // Multi-league normalization stays behind this interface; licensed feeds can replace it.
+import {normalizeBoxScore} from './boxscore.js';
 export const SPORTS = {
   nfl:   {label:'NFL', path:'football/nfl', ball:'football'},
   cfb:   {label:'College Football', path:'football/college-football', ball:'football'},
@@ -56,6 +57,11 @@ export function espnProviderFor(sport){
       return {id:String(e.id),sport,name:e.name,date:e.date,state,status:e.status?.type?.detail||'Scheduled',
         teams,live:state==='in'};
     });
+  },
+  async boxScore(gameId){
+    if(!/^\\d{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
+    const summary=await getJson(sport,'/summary?event='+gameId);
+    return normalizeBoxScore(sport,gameId,summary);
   },
   async plays(gameId){
     if(!/^\d{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
