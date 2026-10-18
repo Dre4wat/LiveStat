@@ -9,10 +9,12 @@ import {makeMonitor} from './src/engine/monitor.js';
 import {normalizeWatch} from './src/engine/events.js';
 import {loadStore,writeStore} from './src/engine/store.js';
 import {sendPush,pushReady,publicVapidKey} from './src/engine/push.js';
+import {validateWebhook,sendDiscordAlert} from './src/engine/discord.js';
 const ROOT=path.dirname(fileURLToPath(import.meta.url));
 process.chdir(ROOT);
 const PORT=Number(process.env.PORT||3000),POLL=Math.max(10,Number(process.env.POLL_SECONDS)||12);
 const state=loadStore();
+state.discord ||= {};
 // Each visitor gets an anonymous, signed browser cookie. There is no code to enter.
 // Cookies isolate saved watches, notification history and push subscriptions.
 const secretFile=path.join(path.resolve(process.env.LIVESTAT_DATA_DIR||path.join(ROOT,'data')),'session-secret');
@@ -77,6 +79,9 @@ const monitor=makeMonitor({providers:espnProviders,state,deliver:async a=>{
   if(!a.ownerId)return;
   const scoped={subscriptions:state.subscriptions.filter(s=>s.ownerId===a.ownerId)};
   await sendPush(scoped,a);
+  // Independent optional Discord relay; never expose a visitor's webhook.
+  const relay=state.discord?.[a.ownerId];
+  if(relay?.enabled)await sendDiscordAlert({...relay,ownerId:a.ownerId},a);
   // Drop expired subscriptions detected by the push sender.
   const valid=new Set(scoped.subscriptions.map(s=>s.endpoint));
   state.subscriptions=state.subscriptions.filter(s=>s.ownerId!==a.ownerId||valid.has(s.endpoint));
@@ -90,6 +95,27 @@ async function handle(req,res){
     if(req.method==='GET'&&route==='/api/status'){
       const watches=state.watches.filter(w=>w.ownerId===ownerId);
       return send(res,200,{...state.stats,watches,alerts:state.alerts.filter(a=>a.ownerId===ownerId).slice(0,250),pushConfigured:pushReady(),subscriberCount:state.subscriptions.filter(s=>s.ownerId===ownerId).length,provider:'ESPN unofficial free'});
+    }
+    if(route==='/api/discord'&&req.method==='GET'){
+      const d=state.discord[ownerId]||{};
+      return send(res,200,{configured:Boolean(d.url),enabled:Boolean(d.enabled),types:d.types||['target']});
+    }
+    if(route==='/api/discord'&&req.method==='POST'){
+      const d=await body(req),old=state.discord[ownerId]||{};
+      const enabled=d.enabled===true,url=String(d.url||'').trim()||old.url||'';
+      if(enabled&&!validateWebhook(url))throw new Error('Enter a valid Discord channel webhook URL');
+      if(d.url&&!validateWebhook(d.url))throw new Error('Invalid Discord webhook URL');
+      const types=Array.isArray(d.types)?d.types.filter(x=>['every','target','near','correction'].includes(x)).slice(0,4):old.types||['target'];
+      state.discord[ownerId]={enabled,url:enabled||old.url?url:'',types:types.length?types:['target']};
+      writeStore(state);
+      return send(res,200,{enabled,configured:Boolean(url),types:state.discord[ownerId].types});
+    }
+    if(route==='/api/discord/test'&&req.method==='POST'){
+      const d=state.discord[ownerId];
+      if(!d?.enabled||!validateWebhook(d.url))throw new Error('Enable your Discord integration first');
+      const result=await sendDiscordAlert(d,{ownerId,category:'target',name:'LiveStat',detail:'Test message from LiveStat',game:'Test connection',demo:false});
+      if(!result.sent)throw new Error('Discord rejected the test or relay is rate limited');
+      return send(res,200,{sent:true});
     }
     if(req.method==='GET'&&route==='/api/teams'){
       const sport=url.searchParams.get('sport')||'nfl',provider=espnProviders[sport];if(!provider)throw new Error('Invalid league');
@@ -170,7 +196,7 @@ async function handle(req,res){
       if(state.watches.filter(w=>w.ownerId===ownerId).length>=40)throw new Error('Up to 40 alert rules per browser');
       if(state.watches.length>=500)throw new Error('Public demo is at capacity');
       const duplicate=state.watches.find(w=>w.ownerId===ownerId&&(w.sport||'nfl')===watch.sport&&w.kind===watch.kind&&w.teamId===watch.teamId&&w.playerId===watch.playerId&&String(w.gameId||'')===watch.gameId);
-      if(duplicate){duplicate.rules=watch.rules;duplicate.stats=watch.stats;duplicate.name=watch.name;writeStore(state);return send(res,200,{watch:duplicate,updated:true});}
+      if(duplicate){duplicate.rules=watch.rules;duplicate.stats=watch.stats;duplicate.smart=watch.smart;duplicate.name=watch.name;writeStore(state);return send(res,200,{watch:duplicate,updated:true});}
       const saved={...watch,ownerId,id:crypto.randomUUID(),createdAt:new Date().toISOString()};
       state.watches.push(saved);writeStore(state);return send(res,201,{watch:saved});
     }
