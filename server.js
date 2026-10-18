@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {espnProviders,SPORTS} from './src/providers/espn.js';
 import {extractBoxTotals} from './src/providers/intelligence.js';
 import {makeMonitor} from './src/engine/monitor.js';
-import {normalizeWatch} from './src/engine/events.js';
+import {normalizeWatch,matchPlay} from './src/engine/events.js';
 import {loadStore,writeStore} from './src/engine/store.js';
 import {sendPush,pushReady,publicVapidKey} from './src/engine/push.js';
 import {validateWebhook,sendDiscordAlert} from './src/engine/discord.js';
@@ -151,7 +151,21 @@ async function handle(req,res){
     if(req.method==='GET'&&route==='/api/intelligence'){
       const {sport,provider}=providerFrom(url),game=safeGame(url);
       const data=await cached('intel:'+sport+':'+game,18000,()=>provider.intelligence(game));
-      return send(res,200,{insights:data});
+      // Best-effort tracked-player quarter splits from available play descriptions.
+      // These are derived counters, not official period box scores.
+      const watches=state.watches.filter(w=>w.ownerId===ownerId&&w.sport===sport&&String(w.gameId)===game).slice(0,40);
+      const watchPeriods=watches.map(w=>{
+        const periods={};
+        for(const play of data.plays||[]){
+          const period=String(play.period||'?');periods[period]||={};
+          for(const event of matchPlay(play,w)){
+            periods[period][event.stat]=(periods[period][event.stat]||0)+event.delta;
+          }
+        }
+        return {watchId:w.id,name:w.name,periods};
+      });
+      return send(res,200,{insights:{...data,watchPeriods}});
+
     }
     if(req.method==='GET'&&route==='/api/profile'){
       const {sport,provider}=providerFrom(url),athlete=url.searchParams.get('athlete')||'';
