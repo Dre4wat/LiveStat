@@ -2,6 +2,19 @@
 
 Cinematic black/red/white sports alerts prototype. Five leagues: NFL, NBA, college football, NCAA men's basketball and NCAA women's basketball. **No private code is needed**; the app opens directly to Select Sport.
 
+## Football player stat tracker — position-aware
+
+The NFL and College Football player loadouts no longer assume every athlete is a receiver. When you select a player, their ESPN roster position determines the default stat menu:
+- QB: completions, passing attempts/yards/TDs, interceptions thrown, rushing attempts/yards/TDs, fumbles
+- RB/FB: rushing and receiving stats (including targets), plus returns and fumbles
+- WR/TE: receiving and rushing stats
+- DL/LB/DB: tackles, solo/assisted tackles, sacks, tackles for loss, interceptions, passes defended, forced fumbles, fumble recoveries and defensive TDs
+- K/P/returner: kicking, punting and return stats relevant to the position
+
+Click **SHOW ALL STATS** to include stats outside the position suggestions, such as QB receiving stats on a trick play.
+
+Stats are validated and saved across the browser and server. The box-score parser identifies passing, rushing, receiving and defensive sections by context; a generic YDS column is never automatically classified as receiving yards. Defender and specialist "Every Change" alerts use **confirmed ESPN box-score differences**, not guaranteed single-play events. One update can combine several plays and may be delayed; initial loading never falsely reports past events as new. Any stat missing from ESPN is shown as unavailable rather than zero.
+
 ## LiveStat v1.0 — Game Intelligence, Missions, Discord
 
 The new features are committed directly to `Dre4wat/LiveStat` and included in the same Render deployment when auto-deploy is enabled.
