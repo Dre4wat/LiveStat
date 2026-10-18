@@ -1,6 +1,7 @@
 // Best-effort, UNOFFICIAL public ESPN endpoints. Never promise realtime accuracy.
 // Multi-league normalization stays behind this interface; licensed feeds can replace it.
 import {normalizeBoxScore} from './boxscore.js';
+import {normalizeIntelligence} from './intelligence.js';
 export const SPORTS = {
   nfl:   {label:'NFL', path:'football/nfl', ball:'football'},
   cfb:   {label:'College Football', path:'football/college-football', ball:'football'},
@@ -9,6 +10,12 @@ export const SPORTS = {
   ncaaw: {label:"College Basketball (Women's)", path:'basketball/womens-college-basketball', ball:'basketball'}
 };
 const BASE='https://site.api.espn.com/apis/site/v2/sports/';
+async function getPublic(url){
+ const r=await fetch(url,{signal:AbortSignal.timeout(11000),headers:{accept:'application/json'}});
+ if(!r.ok)throw new Error('Data provider returned '+r.status);
+ return r.json();
+}
+
 async function getJson(sport,endpoint){
   if(!SPORTS[sport])throw new Error('Unsupported league');
   const res=await fetch(BASE+SPORTS[sport].path+endpoint,{signal:AbortSignal.timeout(12000),headers:{accept:'application/json','user-agent':'LiveStatPersonalPrototype/0.2'}});
@@ -57,6 +64,26 @@ export function espnProviderFor(sport){
       return {id:String(e.id),sport,name:e.name,date:e.date,state,status:e.status?.type?.detail||'Scheduled',
         teams,live:state==='in'};
     });
+  },
+  async intelligence(gameId){
+    if(!/^[0-9]{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
+    const d=await getJson(sport,'/summary?event='+gameId);
+    return normalizeIntelligence(sport,gameId,d);
+  },
+  async playerProfile(athleteId){
+    if(!/^[0-9]{1,14}$/.test(String(athleteId)))throw new Error('Invalid athlete');
+    const prefix='https://site.web.api.espn.com/apis/common/v3/sports/'+SPORTS[sport].path+'/athletes/'+athleteId+'/';
+    const requests=await Promise.allSettled(['overview','stats','gamelog'].map(x=>getPublic(prefix+x)));
+    const obj=Object.fromEntries(['overview','stats','gamelog'].map((k,i)=>[k,requests[i].status==='fulfilled'?requests[i].value:null]));
+    return {sport,athleteId,...obj,unavailable:requests.every(x=>x.status==='rejected')};
+  },
+  async standings(){
+    const d=await getPublic('https://site.api.espn.com/apis/v2/sports/'+SPORTS[sport].path+'/standings');
+    return {sport,data:d};
+  },
+  async injuries(){
+    const d=await getJson(sport,'/injuries');
+    return {sport,data:d};
   },
   async boxScore(gameId){
     if(!/^[0-9]{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
