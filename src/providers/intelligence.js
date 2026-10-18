@@ -68,17 +68,66 @@ export function normalizeIntelligence(sport,gameId,raw){
 }
 export function extractBoxTotals(box,watch){
   if(!box||!watch)return {};
-  const lookup = {'PTS':'points','REB':'rebounds','AST':'assists','STL':'steals','BLK':'blocks','TO':'turnovers','3PM':'threePointers','3PT':'threePointers','REC':'receptions','YDS':'receivingYards','TGTS':'targets','TGT':'targets','FUM':'fumbles','TD':'touchdowns'};
-  const sections=(box.groups||[]).filter(g=>String(g.teamId)===String(watch.teamId)).flatMap(g=>g.sections||[]);
   const result={};
-  for(const section of sections){
-    const idx=(section.rows||[]).findIndex(r=>String(r.id)===String(watch.playerId));
-    if(watch.kind==='player'&&idx<0)continue;
-    const values=watch.kind==='player'?section.rows[idx].stats:section.totals;
-    (section.labels||[]).forEach((k,i)=>{
-      const stat=lookup[txt(k).toUpperCase().replace(/[^A-Z0-9]/g,'')];const n=number(values?.[i]);
-      if(stat&&n!=null&&n>=0&&!Object.hasOwn(result,stat))result[stat]=n;
-    });
+  const football=watch.sport==='nfl'||watch.sport==='cfb';
+  const normalize=x=>String(x||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const n=x=>x==null||String(x).trim()===''?null:(Number.isFinite(Number(x))?Number(x):null);
+  const labelsBB={'PTS':'points','REB':'rebounds','AST':'assists','STL':'steals','BLK':'blocks','TO':'turnovers','3PM':'threePointers','3PT':'threePointers'};
+  const byRole={
+    PASSING:{ATT:'passingAttempts',CMP:'completions',COMP:'completions',COMPLETIONS:'completions',YDS:'passingYards',YARD:'passingYards',YARDS:'passingYards',TD:'passingTouchdowns',TDS:'passingTouchdowns',INT:'interceptionsThrown',INTS:'interceptionsThrown'},
+    RUSHING:{CAR:'rushingAttempts',ATT:'rushingAttempts',RUSH:'rushingAttempts',YDS:'rushingYards',YARDS:'rushingYards',TD:'rushingTouchdowns',TDS:'rushingTouchdowns'},
+    RECEIVING:{REC:'receptions',RECS:'receptions',TGT:'targets',TGTS:'targets',TARGETS:'targets',YDS:'receivingYards',YARDS:'receivingYards',TD:'receivingTouchdowns',TDS:'receivingTouchdowns'},
+    DEFENSE:{TOT:'tackles',TOTAL:'tackles',TACK:'tackles',TACKLES:'tackles',COMB:'tackles',SOLO:'soloTackles',AST:'assistedTackles',ASSIST:'assistedTackles',ASSISTS:'assistedTackles',SACK:'sacks',SACKS:'sacks',TFL:'tacklesForLoss',INT:'interceptionsCaught',INTS:'interceptionsCaught',PD:'passesDefended',PDEF:'passesDefended',PBU:'passesDefended',FF:'forcedFumbles',FR:'fumbleRecoveries',TD:'defensiveTouchdowns'},
+    INTERCEPTIONS:{INT:'interceptionsCaught',INTS:'interceptionsCaught',TD:'defensiveTouchdowns',TDS:'defensiveTouchdowns'},
+    FUMBLES:{FUM:'fumbles',FUMBLES:'fumbles',FF:'forcedFumbles',FR:'fumbleRecoveries'},
+    KICKING:{FGM:'fieldGoalsMade',FGA:'fieldGoalsAttempted',XPM:'extraPointsMade',XPA:'extraPointsAttempted',XP:'extraPointsMade'},
+    PUNTING:{NO:'punts',PUNTS:'punts',YDS:'puntingYards',YARDS:'puntingYards'},
+    KICKRETURNS:{YDS:'kickReturnYards',YARDS:'kickReturnYards',TD:'returnTouchdowns'},
+    PUNTRETURNS:{YDS:'puntReturnYards',YARDS:'puntReturnYards',TD:'returnTouchdowns'}
+  };
+  function category(section){
+    const name=normalize(section.name);
+    if(name.includes('PASSING'))return 'PASSING';
+    if(name.includes('RUSHING'))return 'RUSHING';
+    if(name.includes('RECEIVING'))return 'RECEIVING';
+    if(name.includes('INTERCEPTION'))return 'INTERCEPTIONS';
+    if(name.includes('FUMBLE'))return 'FUMBLES';
+    if(name.includes('KICKRETURN')||name.includes('KICKOFFRETURN'))return 'KICKRETURNS';
+    if(name.includes('PUNTRETURN'))return 'PUNTRETURNS';
+    if(name.includes('DEFEN')||name.includes('TACKLE'))return 'DEFENSE';
+    if(name.includes('PUNT'))return 'PUNTING';
+    if(name.includes('KICK')||name.includes('FIELDGOAL'))return 'KICKING';
+    return '';
+  }
+  for(const group of (box.groups||[])){
+    if(String(group.teamId)!==String(watch.teamId))continue;
+    for(const section of group.sections||[]){
+      const row=watch.kind==='player'?(section.rows||[]).find(p=>String(p.id)===String(watch.playerId)):null;
+      if(watch.kind==='player'&&!row)continue;
+      const values=watch.kind==='player'?row.stats:section.totals;
+      const sectionType=category(section);
+      (section.labels||[]).forEach((key,i)=>{
+        const k=normalize(key),v=values?.[i],parsed=n(v);
+        if(!football){
+          const mapped=labelsBB[k];if(mapped&&parsed!=null&&!Object.hasOwn(result,mapped))result[mapped]=parsed;
+          return;
+        }
+        if(!sectionType)return; // Never treat generic YDS or TD as receiving stats.
+        const map=byRole[sectionType]||{};
+        const compound=/^\s*(\d+)\s*[/-]\s*(\d+)\s*$/.exec(String(v??''));
+        if(sectionType==='PASSING'&&(k==='CATT'||k==='CMPATT'||k==='COMPATT')&&compound){
+          result.completions=Number(compound[1]);result.passingAttempts=Number(compound[2]);return;
+        }
+        if(sectionType==='KICKING'&&k==='FG'&&compound){
+          result.fieldGoalsMade=Number(compound[1]);result.fieldGoalsAttempted=Number(compound[2]);return;
+        }
+        if(sectionType==='KICKING'&&k==='XP'&&compound){
+          result.extraPointsMade=Number(compound[1]);result.extraPointsAttempted=Number(compound[2]);return;
+        }
+        const stat=map[k];
+        if(stat&&parsed!=null&&!Object.hasOwn(result,stat))result[stat]=parsed;
+      });
+    }
   }
   return result;
 }
