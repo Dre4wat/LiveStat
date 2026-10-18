@@ -18,4 +18,5 @@ jobs:
       - run: node --check src/providers/espn.js
       - run: node --check public/intelligence-ui.js
       - run: node --check src/providers/intelligence.js
+      - run: node --check src/engine/discord.js
       - run: npm test
