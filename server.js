@@ -210,7 +210,7 @@ async function handle(req,res){
       if(state.watches.filter(w=>w.ownerId===ownerId).length>=40)throw new Error('Up to 40 alert rules per browser');
       if(state.watches.length>=500)throw new Error('Public demo is at capacity');
       const duplicate=state.watches.find(w=>w.ownerId===ownerId&&(w.sport||'nfl')===watch.sport&&w.kind===watch.kind&&w.teamId===watch.teamId&&w.playerId===watch.playerId&&String(w.gameId||'')===watch.gameId);
-      if(duplicate){duplicate.rules=watch.rules;duplicate.stats=watch.stats;duplicate.smart=watch.smart;duplicate.name=watch.name;writeStore(state);return send(res,200,{watch:duplicate,updated:true});}
+      if(duplicate){duplicate.rules=watch.rules;duplicate.stats=watch.stats;duplicate.smart=watch.smart;duplicate.name=watch.name;duplicate.position=watch.position;writeStore(state);return send(res,200,{watch:duplicate,updated:true});}
       const saved={...watch,ownerId,id:crypto.randomUUID(),createdAt:new Date().toISOString()};
       state.watches.push(saved);writeStore(state);return send(res,201,{watch:saved});
     }
