@@ -1,6 +1,52 @@
-# LiveStat Arena v0.8 — public-access edition
+# LiveStat Arena v1.0 — sports intelligence prototype
 
 Cinematic black/red/white sports alerts prototype. Five leagues: NFL, NBA, college football, NCAA men's basketball and NCAA women's basketball. **No private code is needed**; the app opens directly to Select Sport.
+
+## LiveStat v1.0 — Game Intelligence, Missions, Discord
+
+The new features are committed directly to `Dre4wat/LiveStat` and included in the same Render deployment when auto-deploy is enabled.
+
+### Game Center
+On a match card tap **GAME CENTER**:
+- Live/archived play-by-play grouped by quarter, with scoring plays and highlights for names in the saved watchlist.
+- Game momentum from score differences, lead changes and biggest leads.
+- ESPN-supplied win probability where provided; never a fabricated model estimate.
+- Period scoring totals, scoring timeline and close-game Clutch Mode.
+- NFL/CFB drive cards with available plays, yardage, starts and results.
+- Basketball shot locations only if coordinates exist. Court diagram is approximate; no chart if source has no coordinates.
+- Text recap export and any saved alerts matching the game's name.
+
+### Command Center / Mission Tracker
+- Your active player and team watch targets update from the box scores currently supplied by ESPN.
+- One card per player or game, progress bars, missing-data states, pinning, comparison of two saved players, and mission completion.
+- Updating while the screen is visible approximately every 25 seconds. No guaranteed background live update on the free Render plan.
+
+### Advanced Alert Builder
+Within an alert loadout:
+- Every-play and individual milestone alerts remain independent.
+- Extra once-per-game combined mission alert when ALL or ANY of at least two targets are achieved.
+- Optional "almost there" alert before a target, plus min-quarter and max-score-margin constraints on the combined alert.
+- NFL/CFB team events include red-zone entries (at most once per drive), scoring drives and turnovers where play text supports identification.
+- Box-score verification checks missed threshold crossings and downward stat corrections but does **not** invent individual plays for a box-score jump.
+
+### League Center and profiles
+- League standings and injury reports (when ESPN exposes a supported response).
+- Season player stats, recent game logs, and pregame form/scouting available in Player Profile.
+- Historical matches through the date picker; availability depends on ESPN's retention.
+
+### Optional Discord integration
+Open **Settings → Discord Alert Relay**:
+1. In your Discord channel, create a webhook under Channel Settings → Integrations → Webhooks.
+2. Paste its HTTPS URL into LiveStat (do not share the URL in chat).
+3. Choose from per-play, milestone, almost-there and correction messages; enable and save.
+4. Send a test event.
+
+The webhook is stored server-side for the browser's anonymous session. It is not shown in the response or shared with other visitors; cross-site updates are rejected. Disable it at any time. Webhooks can disappear when free Render ephemeral storage is reset. Discord is opt-in; rate-limited and configured with no mass mentions.
+
+### Accuracy and availability caveats
+This is a substantial functional prototype, **not a verified commercial real-time stat service**. ESPN's public interfaces are unofficial and vary by league and game. Live push notifications, game-specific shot coordinates, historic player game logs, injuries and standings are best effort and not end-to-end verified across all competitions. Full period-by-period *player* splits, exhaustive opponent-specific scouting, downloadable video highlights, and licensed near-instant data are not guaranteed. Free Render can sleep and lose watchlists/webhooks on restart. Paid always-on hosting with durable storage is recommended for reliable notifications.
+
+API additions: `/api/intelligence`, `/api/profile`, `/api/league`, `/api/tracker`, `/api/discord`. Tests: `npm test`; GitHub Actions syntax and integration tests run on every push to main.
 
 ## Game box scores (v0.8)
 
