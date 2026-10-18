@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#09090c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="LiveStat Arena — game-first NFL, NBA and college sports stat alerts." />
+  <title>LiveStat // Arena</title>
+  <link rel="manifest" href="/manifest.json" /><link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/cinematic.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="side">
+      <button class="logo side-logo" data-action="nav" data-tab="arena" aria-label="LiveStat home"><span class="logo-glyph">LS</span><span class="logo-type">Live<span>Stat</span><small>REAL GAMES. REAL MOMENTS.</small></span></button>
+      <div class="side-menu-label">COMMAND CENTER</div>
+      <button class="side-item is-active" data-action="nav" data-tab="arena"><span class="side-icon">⌂</span> Game Center <span class="side-arrow">↗</span></button>
+      <button class="side-item" data-action="nav" data-tab="watches"><span class="side-icon">◎</span> My Alerts <span class="side-badge" id="side-watch-count">0</span></button>
+      <button class="side-item" data-action="nav" data-tab="activity"><span class="side-icon">▥</span> Live Activity</button>
+      <button class="side-item" data-action="nav" data-tab="settings"><span class="side-icon">⚙</span> Settings</button>
+      <div class="side-spacer"></div>
+      <div class="side-card"><span class="status-beam"></span><small>THE CONTROL ROOM</small><strong>Your players.<br/>Your moments.</strong><span>One alert per play. Milestones when they matter.</span></div>
+      <div class="side-foot">LIVESTAT / V0.7 <span>● FREE DATA</span></div>
+    </aside>
+    <div class="main-shell">
+      <header class="top-bar">
+        <button class="logo mobile-logo" data-action="nav" data-tab="arena"><span class="logo-glyph">LS</span><span class="logo-type">Live<span>Stat</span></span></button>
+        <div class="top-title">LIVE SPORTS <span class="top-divider">//</span> ALERT COMMAND</div>
+        <div class="top-actions"><span class="live-pill"><span class="live-dot"></span> FREE FEED</span><button class="header-icon" data-action="nav" data-tab="activity" aria-label="Activity">♧<span class="red-indicator"></span></button></div>
+      </header>
+      <main id="app" class="app-area"></main>
+      <div class="footbar">BUILT FOR THE MOMENT <span>•</span> NFL &nbsp; / &nbsp; NBA &nbsp; / &nbsp; NCAA <span class="footbar-right">THE GAME IS NEVER QUIET.</span></div>
+    </div>
+  </div>
+  <nav class="mobile-nav" aria-label="Main navigation">
+    <button class="mobile-nav-item active" data-action="nav" data-tab="arena"><span>◈</span><small>Home</small></button>
+    <button class="mobile-nav-item" data-action="nav" data-tab="watches"><span>◎</span><small>Alerts</small></button>
+    <button class="mobile-nav-item" data-action="nav" data-tab="activity"><span>▥</span><small>Activity</small></button>
+    <button class="mobile-nav-item" data-action="nav" data-tab="settings"><span>⚙</span><small>Settings</small></button>
+  </nav>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
