@@ -27,6 +27,8 @@ export function pruneStore(state){
       for(const k of Object.keys(state.totals))if(k.startsWith(game+':'))delete state.totals[k];
     }
   }
+  const verified=Object.keys(state.boxVerified||{});
+  if(verified.length>3000)for(const k of verified.slice(0,verified.length-3000))delete state.boxVerified[k];
   const keys=Object.keys(state.notified);
   if(keys.length>15000) {
     for(const k of keys.slice(0,keys.length-15000)) delete state.notified[k];
