@@ -1,4 +1,4 @@
-export function createInsights({api,escape,refresh}) {
+export function createInsights({api,escape,refresh,getWatches=()=>[],getAlerts=()=>[]}) {
   const esc=escape;
   const state={kind:'game',sport:'nba',game:null,details:null,loading:false,error:'',tab:'overview',selected:null,
     tracker:null,profiles:null,league:null,leagueSection:'standings',profile:null,profileData:null,compare:[]};
@@ -10,8 +10,8 @@ export function createInsights({api,escape,refresh}) {
   function notice(message){return `<div class="ls-i-empty">${esc(message)}</div>`}
   function tabs(items){return `<div class="ls-i-tabs">${items.map(([id,title])=>`<button class="${state.tab===id?'active':''}" data-action="intel-tab" data-value="${id}">${title}</button>`).join('')}</div>`}
   function statRows(lines){return `<div class="ls-i-stats">${lines.map(([label,value])=>`<div><span>${esc(label)}</span><strong>${esc(value ?? '—')}</strong></div>`).join('')}</div>`}
-  function gameHeader(){const g=state.game||{},a=g.teams||state.details?.teams||[];
-    return `<header class="ls-i-head"><div><span class="ls-i-eyebrow">GAME INTELLIGENCE / ${esc(sportName())}</span><h1>${esc(g.name||a.map(x=>x.abbr).join(' vs ')||'Game Center')}</h1><p>${esc(g.status||state.details?.status||'Game details')}</p></div><div class="ls-i-score">${a.slice(0,2).map(t=>`<div><small>${esc(t.abbr||t.name||'TEAM')}</small><strong>${esc(t.score??'—')}</strong></div>`).join('')}</div></header>`}
+  function gameHeader(){const g=state.game||{},a=state.details?.teams?.length?state.details.teams:(g.teams||[]);
+    return `<header class="ls-i-head"><div><span class="ls-i-eyebrow">GAME INTELLIGENCE / ${esc(sportName())}</span><h1>${esc(g.name||a.map(x=>x.abbr).join(' vs ')||'Game Center')}</h1><p>${esc(state.details?.status||g.status||'Game details')}</p></div><div class="ls-i-score">${a.slice(0,2).map(t=>`<div><small>${esc(t.abbr||t.name||'TEAM')}</small><strong>${esc(t.score??'—')}</strong></div>`).join('')}</div></header>`}
   function lineChart(points,key,min,max){
     const data=(points||[]).filter(p=>Number.isFinite(Number(p[key])));if(data.length<2)return notice('Not enough scoring events to draw a chart.');
     const low=min??Math.min(...data.map(d=>Number(d[key])),0),high=max??Math.max(...data.map(d=>Number(d[key])),1);
@@ -21,7 +21,7 @@ export function createInsights({api,escape,refresh}) {
   }
   function trackerCard(w) {
     const goals=w.goals||{done:0,total:0};
-    return `<article class="ls-i-card"><div class="ls-i-card-head"><strong>${esc(w.name)}</strong><span>${esc(names[w.sport]||w.sport)} · ${esc(w.source||'')}</span></div><p class="ls-i-muted">${esc(w.game?.status||'Game '+w.gameId)}</p>
+    return `<article class="ls-i-card"><div class="ls-i-card-head"><strong>${esc(w.name)}</strong><span>${esc(names[w.sport]||w.sport)} · ${esc(w.source||'')}</span></div><p class="ls-i-muted">${esc(w.game?.status||'Game '+w.gameId)}${w.game?.teams?.length?' · '+esc(w.game.teams.map(t=>(t.abbr||t.name)+' '+(t.score||'')).join(' vs ')):''}</p>
       ${(w.stats||[]).map(m=>`<div class="ls-i-progress"><div><b>${esc(statNames[m.stat]||m.stat)}</b><span>${m.current==null?'N/A':esc(m.current)}${m.target!=null?' / '+esc(m.target):''} ${m.complete?'✓':''}</span></div><div class="ls-i-track"><i style="width:${m.target!=null&&m.current!=null?Math.min(100,Math.max(0,m.current/m.target*100)):0}%"></i></div></div>`).join('')}
       <div class="ls-i-controls"><span class="ls-i-chip">${goals.done}/${goals.total} TARGETS</span>${goals.total>0&&goals.complete?'<span class="ls-i-chip success">MISSION COMPLETE</span>':''}<button data-action="intel-open" data-sport="${esc(w.sport)}" data-game="${esc(w.gameId)}">OPEN GAME ↗</button></div></article>`;
   }
@@ -30,7 +30,7 @@ export function createInsights({api,escape,refresh}) {
     if(state.error&&!state.tracker)return notice('Player tracker: '+state.error);
     const watches=state.tracker?.tracker||[];
     return `<div class="ls-i-title"><span>YOUR MULTI-GAME OPERATIONS HUB</span><h1>COMMAND <em>CENTER</em></h1><p>Live player goals, mission progress, and comparisons. Numbers are only shown when ESPN provides them.</p></div>
-      <div class="ls-i-actions"><button data-action="intel-reload">↻ UPDATE TRACKER</button><span>${watches.length} SAVED PLAYERS & TEAMS</span></div>
+      <div class="ls-i-actions"><button data-action="intel-reload">↻ UPDATE TRACKER</button><button data-action="intel-leagueopen">LEAGUE STANDINGS / INJURIES ↗</button><span>${watches.length} SAVED PLAYERS & TEAMS</span></div>
       ${watches.length?`<div class="ls-i-grid">${watches.map(trackerCard).join('')}</div>`:notice('No saved alerts yet. Choose a game, select a player, and save an alert loadout first.')}
       <section class="ls-i-panel"><h2>PLAYER COMPARISON</h2><p>Compare players tracked in the same or different games.</p>
       <div class="ls-i-compare-chooser"><select id="ls-i-left"><option value="">Choose first player</option>${watches.filter(w=>w.kind==='player').map(w=>`<option value="${esc(w.id)}" ${state.compare[0]===w.id?'selected':''}>${esc(w.name)}</option>`).join('')}</select>
@@ -39,7 +39,15 @@ export function createInsights({api,escape,refresh}) {
   }
   function timeline(plays,heading){
     if(!plays?.length)return notice('No plays available from the data provider.');
-    return `<div class="ls-i-panel"><h2>${heading}</h2><div class="ls-i-timeline">${plays.slice(-350).reverse().map(p=>`<button data-action="intel-play" data-play="${esc(p.id)}" class="${p.scoring?'scoring':''}"><span class="ls-i-time">${esc(clock(p))}</span><strong>${esc(p.type|| (p.scoring?'SCORING PLAY':'PLAY'))}</strong><p>${esc(p.text||'No description')}</p></button>`).join('')}</div></div>`;
+    const tracked=(getWatches()||[]).filter(w=>w.sport===state.sport&&String(w.gameId||'')===String(state.game?.id||''));
+    let lastQuarter=null;
+    const rows=plays.slice(-350).reverse().map(p=>{
+      const quarter=p.period||'?',group=quarter!==lastQuarter?'<h3>QUARTER '+esc(quarter)+'</h3>':'';
+      lastQuarter=quarter;
+      const watched=tracked.filter(w=>w.kind==='player'&&w.name&&p.text?.toLowerCase().includes(w.name.toLowerCase()));
+      return group+'<button data-action="intel-play" data-play="'+esc(p.id)+'" class="'+(p.scoring?'scoring ':'')+(watched.length?'watched':'')+'"><span class="ls-i-time">'+esc(clock(p))+'</span><strong>'+esc(p.type||(p.scoring?'SCORING PLAY':'PLAY'))+(watched.length?' · ★ WATCHLIST':'')+'</strong><p>'+esc(p.text||'No description')+'</p></button>';
+    }).join('');
+    return '<div class="ls-i-panel"><h2>'+heading+'</h2><div class="ls-i-timeline">'+rows+'</div></div>';
   }
   function overview(){
     const d=state.details;
@@ -91,7 +99,7 @@ export function createInsights({api,escape,refresh}) {
     const p=state.selected&&d.plays?.find(x=>x.id===state.selected);
     return `<div class="ls-i-actions"><button data-action="intel-back">← BACK TO GAMES</button><button data-action="intel-reload">↻ REFRESH</button></div>${gameHeader()}
     ${state.error?notice(state.error):''}${tabs(items)}${p?`<div class="ls-i-selected"><button data-action="intel-clear">✕</button><strong>${esc(clock(p))}</strong><p>${esc(p.text)}</p>${p.homeScore!=null?`<small>HOME ${p.homeScore} · AWAY ${p.awayScore}</small>`:''}</div>`:''}
-    ${state.tab==='plays'?timeline(d.plays,'PLAY BY PLAY'):state.tab==='momentum'?momentumView():state.tab==='scoring'?timeline(d.scoring,'SCORING SUMMARY'):state.tab==='clutch'?clutchView():state.tab==='drives'?driveView():state.tab==='shots'?shotsView():state.tab==='replay'?`<div class="ls-i-panel"><h2>PERSONAL GAME REPLAY</h2><p>Review scoring plays and your saved alert events after the game. Video playback is not included.</p></div>${timeline(d.scoring,'SCORING HIGHLIGHTS')}`:overview()}`;
+    ${state.tab==='plays'?timeline(d.plays,'PLAY BY PLAY'):state.tab==='momentum'?momentumView():state.tab==='scoring'?timeline(d.scoring,'SCORING SUMMARY'):state.tab==='clutch'?clutchView():state.tab==='drives'?driveView():state.tab==='shots'?shotsView():state.tab==='replay'?`<div class="ls-i-panel"><h2>PERSONAL GAME REPLAY</h2><p>Review scoring plays and personalized alert events after the game. Video playback is not included.</p><button class="ls-i-replay" data-action="intel-copy">COPY TEXT RECAP</button>${(()=>{const entries=(getAlerts()||[]).filter(x=>x.sport===state.sport&&x.game&&(x.game===state.game?.name||x.game.includes(state.game?.name||'____')));return entries.length?`<div class="ls-i-timeline">${entries.slice(0,60).map(x=>`<div class="ls-i-log"><strong>${esc(x.name)} — ${esc(x.label)}</strong><p>${esc(x.detail)}</p></div>`).join('')}</div>`:notice('No saved alerts associated with this game yet.')})()}</div>${timeline(d.scoring,'SCORING HIGHLIGHTS')}`:overview()}`;
   }
   function tableFromStats(stats){
     const categories=stats?.categories||[];
@@ -156,6 +164,12 @@ export function createInsights({api,escape,refresh}) {
   function openLeague(sport){state.kind='league';state.sport=sport||state.sport;state.leagueSection='standings';state.league=null;return reload()}
   function openProfile(sport,athlete){state.kind='profile';state.sport=sport;state.profile=athlete;state.profileData=null;return reload()}
   function handle(action,node){
+    if(action==='intel-copy'){
+      const d=state.details||{};
+      const summary=[(state.game?.name||'Game')+' — LiveStat Replay',...((d.scoring||[]).map(p=>'Q'+p.period+' '+p.clock+' '+p.text))].join('\n');
+      if(typeof navigator!=='undefined'&&navigator.clipboard?.writeText)navigator.clipboard.writeText(summary).catch(()=>{});
+      return true;
+    }
     if(action==='intel-tab'){state.tab=node.dataset.value;state.selected=null;refresh();return true}
     if(action==='intel-play'){state.selected=node.dataset.play;refresh();return true}
     if(action==='intel-clear'){state.selected=null;refresh();return true}
