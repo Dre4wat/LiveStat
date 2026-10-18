@@ -105,3 +105,14 @@
 .ls-i-timeline button.watched{border-left-color:#ffce72;background:#3c231c}
 .ls-i-replay{background:#ac2337;color:white;border:1px solid #f44b5d;border-radius:8px;padding:10px 14px;font-weight:800;font-size:12px;margin:0 0 15px}
 @media(max-width:900px){.mobile-nav{grid-template-columns:repeat(5,1fr)!important}.mobile-nav-item small{font-size:9px!important}}
+
+.ls-discord-card{border-color:#713441!important;background:linear-gradient(145deg,#24171c,#101014)!important}
+.ls-discord-field{display:block;color:#edd0d5;font-size:11px;font-weight:800}
+.ls-discord-field input{display:block;margin:8px 0 13px;width:100%;min-width:0;background:#161014;border:1px solid #7b3a49;border-radius:7px;padding:10px;color:white}
+.ls-discord-toggle{display:flex;align-items:center;gap:9px;font-size:12px;color:#fff;font-weight:800}
+.ls-discord-toggle input,.ls-discord-modes input{accent-color:#e53449}
+.ls-discord-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}
+.ls-discord-modes label{display:flex;gap:5px;align-items:center;color:#d0b7bc;font-size:10px}
+.ls-discord-card .btn-secondary{margin:5px!important}
+.ls-discord-warning{font-size:10px!important;color:#c68b95!important;margin-top:12px}
+@media(max-width:520px){.ls-discord-modes{grid-template-columns:1fr}}
