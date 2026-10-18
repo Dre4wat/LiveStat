@@ -2,6 +2,7 @@
 // Multi-league normalization stays behind this interface; licensed feeds can replace it.
 import {normalizeBoxScore} from './boxscore.js';
 import {normalizeIntelligence} from './intelligence.js';
+import {enrichRoster} from './roster-ranking.js';
 export const SPORTS = {
   nfl:   {label:'NFL', path:'football/nfl', ball:'football'},
   cfb:   {label:'College Football', path:'football/college-football', ball:'football'},
@@ -44,13 +45,23 @@ export function espnProviderFor(sport){
       .filter(x=>x.id&&x.displayName).map(x=>({id:String(x.id),name:x.displayName,
         abbreviation:x.abbreviation||'',logo:x.logos?.[0]?.href||null})).sort((a,b)=>a.name.localeCompare(b.name));
   },
-  async roster(teamId){
-    if(!/^\d{1,8}$/.test(String(teamId)))throw new Error('Invalid team');
-    const d=await getJson(sport,`/teams/${teamId}/roster`);
-    return flattenRoster(d.athletes||[]).filter(p=>p.id&&p.displayName).map(p=>({id:String(p.id),
-      name:p.displayName,shortName:p.shortName||p.displayName,
-      position:p.position?.abbreviation||p.position?.displayName||'',headshot:p.headshot?.href||null,
-      teamId:String(teamId)})).sort((a,b)=>a.name.localeCompare(b.name));
+  async roster(teamId,{gameId}={}){
+    if(!/^[0-9]{1,8}$/.test(String(teamId)))throw new Error('Invalid team');
+    if(gameId&&!/^[0-9]{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
+    // Roster is essential; all ranking sources are optional. Missing depth chart
+    // or leaders must never prevent someone from selecting a player.
+    const [rosterData,depthResult,leaderResult,gameResult]=await Promise.all([
+      getJson(sport,`/teams/${teamId}/roster`),
+      getJson(sport,`/teams/${teamId}/depthcharts`).catch(()=>null),
+      getJson(sport,`/teams/${teamId}/leaders`).catch(()=>null),
+      gameId?getJson(sport,`/summary?event=${gameId}`).then(raw=>normalizeBoxScore(sport,gameId,raw)).catch(()=>null):Promise.resolve(null)
+    ]);
+    const players=flattenRoster(rosterData.athletes||[]).filter(p=>p.id&&p.displayName).map(p=>({
+      id:String(p.id),name:p.displayName,shortName:p.shortName||p.displayName,
+      position:p.position?.abbreviation||p.position?.displayName||'',
+      jersey:p.jersey||'',headshot:p.headshot?.href||null,teamId:String(teamId)
+    }));
+    return enrichRoster(players,sport,{depthCharts:depthResult,leaders:leaderResult,boxScore:gameResult})
   },
   async games({date}={}){
     const params=sport==='cfb'?'?groups=90&limit=400':(sport==='ncaam'||sport==='ncaaw')?'?groups=50&limit=500':'';
