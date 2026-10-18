@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import {matchPlay,statCatalog} from './events.js';
 import {SPORTS} from '../providers/espn.js';
 import {extractBoxTotals} from '../providers/intelligence.js';
+import {footballPositionGroup} from '../../public/football-stats.js';
 import {pruneStore,writeStore} from './store.js';
 const gameKey=(sport,id)=>`${sport}:${id}`;
 const totalKey=(game,watch,stat)=>`${game}:${watch.id}:${stat}`;
@@ -127,7 +128,28 @@ export function makeMonitor({providers,provider,state,deliver,emit=()=>{}}){
         if(!Number.isFinite(current))continue;
         const old=state.boxVerified[key];
         state.boxVerified[key]=current;
+        const group=footballPositionGroup(watch.position);
+        const boxOnly=watch.kind==='player'&&['nfl','cfb'].includes(watch.sport)
+          &&(group==='DEF'||[
+            'fieldGoalsMade','fieldGoalsAttempted','extraPointsMade','extraPointsAttempted',
+            'punts','puntingYards','kickReturnYards','puntReturnYards','returnTouchdowns'
+          ].includes(stat));
+        if(boxOnly)state.totals[key]=current; // Source of truth for positions with unreliable per-play attribution.
         if(old==null)continue; // Never backfill earlier events as live notifications.
+        if(boxOnly&&rule.every&&current!==old){
+          const id=watch.id+':'+gk+':box-update:'+stat+':'+current;
+          if(!state.notified[id]){
+            state.notified[id]=Date.now();
+            const label=statCatalog(watch.sport,watch.kind)[stat]||stat;
+            const alert={id,watchId:watch.id,sport:watch.sport,kind:watch.kind,name:watch.name,
+              stat,category:current<old?'correction':'every',label:label+' · BOX SCORE UPDATE',
+              detail:'ESPN updated '+label.toLowerCase()+': '+old+' → '+current+' (+'+(current-old)+')',
+              game:game.name,delta:current-old,oldTotal:old,total:current,period:'?',clock:'',
+              description:'Box score update; may combine multiple plays',time:new Date().toISOString(),demo:false};
+            state.alerts.unshift(alert);emit('alert',alert);
+            try{await deliver(alert);}catch(err){state.stats.lastError='Push failed: '+err.message;}
+          }
+        }
         if(rule.target!=null&&old<rule.target&&current>=rule.target){
           const event={stat,label:statCatalog(watch.sport,watch.kind)[stat]||stat,delta:current-old,detail:'Confirmed box-score milestone'};
           const play={id:'box-confirmed-'+game.id,text:'ESPN box score confirmed a milestone',period:'?',clock:''};
@@ -139,7 +161,7 @@ export function makeMonitor({providers,provider,state,deliver,emit=()=>{}}){
             try{await deliver(alert);}catch(err){state.stats.lastError='Push failed: '+err.message;}
           }
         }
-        if(current<old&&rule.every){
+        if(current<old&&rule.every&&!boxOnly){
           const id=watch.id+':'+gk+':correction:'+stat+':'+old+':'+current;
           if(!state.notified[id]){
             state.notified[id]=Date.now();
