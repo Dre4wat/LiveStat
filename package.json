@@ -1,0 +1,14 @@
+{
+  "name": "livestat-public-arena",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "description": "Cinematic sports-game inspired, game-first per-play and milestone alert PWA prototype",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {"node": ">=20"},
+  "dependencies": {"web-push": "^3.6.7"}
+}
