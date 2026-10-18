@@ -1,0 +1,15 @@
+# Experimental free hosting only: idle instances sleep, storage is ephemeral.
+services:
+  - type: web
+    name: livestat-arena
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: POLL_SECONDS
+        value: '12'
