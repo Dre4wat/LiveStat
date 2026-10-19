@@ -3,6 +3,7 @@
 import {normalizeBoxScore} from './boxscore.js';
 import {normalizeIntelligence} from './intelligence.js';
 import {enrichRoster} from './roster-ranking.js';
+import {normalizeGameLog,normalizeSeasonStats,normalizeESPNPlayerSearch} from './analytics.js';
 export const SPORTS = {
   nfl:   {label:'NFL', path:'football/nfl', ball:'football'},
   cfb:   {label:'College Football', path:'football/college-football', ball:'football'},
@@ -87,6 +88,39 @@ export function espnProviderFor(sport){
     const requests=await Promise.allSettled(['overview','stats','gamelog'].map(x=>getPublic(prefix+x)));
     const obj=Object.fromEntries(['overview','stats','gamelog'].map((k,i)=>[k,requests[i].status==='fulfilled'?requests[i].value:null]));
     return {sport,athleteId,...obj,unavailable:requests.every(x=>x.status==='rejected')};
+  },
+  async analyticsPlayer(athleteId,season){
+    if(!/^[0-9]{1,14}$/.test(String(athleteId)))throw Error('Invalid athlete ID');
+    if(!Number.isInteger(Number(season))||Number(season)<1980||Number(season)>new Date().getUTCFullYear()+2)throw Error('Invalid season');
+    const prefix='https://site.web.api.espn.com/apis/common/v3/sports/'+SPORTS[sport].path+'/athletes/'+athleteId+'/';
+    const [log,stats,overview]=await Promise.allSettled([
+      getPublic(prefix+'gamelog?season='+season),
+      getPublic(prefix+'stats?season='+season),
+      getPublic(prefix+'overview')
+    ]);
+    const history=normalizeGameLog(log.status==='fulfilled'?log.value:null,season);
+    const seasonStats=normalizeSeasonStats(stats.status==='fulfilled'?stats.value:null,season);
+    const profile=overview.status==='fulfilled'?overview.value:{};
+    const athlete=profile.athlete||profile.player||{};
+    const team=athlete.team||profile.team||{};
+    const headshot=athlete.headshot?.href||athlete.headshot||profile.headshot?.href||'';
+    return {
+      sport,athleteId:String(athleteId),season:Number(season),
+      player:{id:String(athleteId),name:athlete.displayName||athlete.fullName||'',
+        position:athlete.position?.abbreviation||athlete.position?.displayName||'',
+        headshot:String(headshot||''),team:String(team.displayName||team.name||''),
+        teamAbbr:String(team.abbreviation||''),teamColor:String(team.color||''),
+        alternateColor:String(team.alternateColor||'')},
+      history,seasonStats,
+      unavailable:log.status==='rejected'&&stats.status==='rejected',
+      feedWarnings:[...(log.status==='rejected'?['Game log unavailable']:[]),
+        ...(stats.status==='rejected'?['Season aggregates unavailable']:[])]
+    };
+  },
+  async searchAthletes(query){
+    if(typeof query!=='string'||query.trim().length<2||query.trim().length>70)throw Error('Search needs 2–70 characters');
+    const data=await getPublic('https://site.web.api.espn.com/apis/search/v2?query='+encodeURIComponent(query)+'&limit=50');
+    return normalizeESPNPlayerSearch(data,query,sport);
   },
   async standings(){
     const d=await getPublic('https://site.api.espn.com/apis/v2/sports/'+SPORTS[sport].path+'/standings');
