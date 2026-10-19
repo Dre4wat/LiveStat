@@ -81,7 +81,7 @@ export async function fetchOrArchivePlayer(sport,athleteId,season,fetchLive,{ref
   const stored=await loadPlayerSeason(sport,athleteId,season).catch(()=>null);
   const saved=stored?.data;
   const sufficient=Boolean(saved?.history?.games?.length||saved?.seasonStats?.categories?.length);
-  if(!refresh&&sufficient&&(Number(season)<new Date().getUTCFullYear()-1)){
+  if(!refresh&&sufficient&&Boolean(String(saved?.player?.name||'').trim())&&(Number(season)<new Date().getUTCFullYear()-1)){
     return {...saved,archive:{mode:archiveMode(),source:'saved',savedAt:stored.savedAt}};
   }
   try{
