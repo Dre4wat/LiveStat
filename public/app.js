@@ -5,6 +5,7 @@ import {FOOTBALL_PLAYER_STATS,footballStatsForPosition} from './football-stats.j
 import {createInsights} from './intelligence-ui.js';
 import {boxscoreMarkup} from './boxscore.js';
 const $ = (s,root=document)=>root.querySelector(s);
+/* UI init selector fixes: querySelectorAll for collections; keep startup regression test */
 const $$ = (s,root=document)=>[...root.querySelectorAll(s)];
 const esc = s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const leagues={nfl:{name:'NFL',short:'PRO FOOTBALL',icon:'🏈',code:'01'},nba:{name:'NBA',short:'PRO BASKETBALL',icon:'🏀',code:'02'},cfb:{name:'COLLEGE FOOTBALL',short:'NCAA FOOTBALL',icon:'🏈',code:'03'},ncaam:{name:'COLLEGE BASKETBALL',short:'NCAA MEN',icon:'🏀',code:'04'},ncaaw:{name:'WOMEN’S COLLEGE HOOPS',short:'NCAA WOMEN',icon:'🏀',code:'05'}};
