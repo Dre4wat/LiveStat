@@ -185,7 +185,10 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
  }
  async function loadMore(count=8,currentSeq=state.seq){
    if(state.loadingStats||currentSeq!==state.seq)return;
-   const candidate=state.players.filter(p=>!state.loaded.has(p.id)&&!state.failed.has(p.id)).slice(0,count);
+   const priority=sortedList(),active=selected();
+   const prioritized=[...(active?[active]:[]),...priority,...state.players];
+   const candidate=[...new Map(prioritized.map(x=>[x.id,x])).values()]
+     .filter(p=>!state.loaded.has(p.id)&&!state.failed.has(p.id)).slice(0,count);
    if(!candidate.length){state.statsCursor=state.players.length;up();return}
    state.loadingStats=true;up();
    try{
@@ -200,12 +203,18 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
        }catch(e){ids.forEach(id=>{state.failed.add(id);state.loaded.add(id)})}
        state.statsCursor=state.loaded.size;up();
      }
-   }finally{if(currentSeq===state.seq){state.loadingStats=false;up()}}
+   }finally{if(currentSeq===state.seq){
+     state.loadingStats=false;up();
+     // A different athlete or position group may have been selected while
+     // a batch was loading. Prioritize that athlete immediately afterward.
+     if(state.selectedId&&!state.loaded.has(state.selectedId)&&!state.failed.has(state.selectedId))
+       loadMore(1,currentSeq);
+   }}
  }
  function selectPlayer(id){
    const p=state.players.find(x=>String(x.id)===String(id));if(!p)return;
    state.selectedId=String(p.id);up();
-   if(!state.loaded.has(p.id)&&!state.loadingStats)loadMore(8);
+   if(!state.loaded.has(p.id)&&!state.loadingStats)loadMore(1);
  }
  function setSport(sport){
    if(!leagues[sport])return;
@@ -221,7 +230,8 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
    const d=node?.dataset||{};
    if(action==='roster-select'){selectPlayer(d.id);return true}
    if(action==='roster-group'){
-     state.group=d.key||'ALL';state.sortKey='';up();return true;
+     state.group=d.key||'ALL';state.sortKey='';up();
+     if(!state.loadingStats)loadMore(8);return true;
    }
    if(action==='roster-sort'){state.sortKey=d.key;up();return true}
    if(action==='roster-more'){loadMore(8);return true}
