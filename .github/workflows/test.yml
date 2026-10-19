@@ -23,4 +23,6 @@ jobs:
       - run: node --check public/analytics-lab.js
       - run: node --check public/analytics-card.js
       - run: node --check public/formula.js
+      - run: node --check public/roster-browser.js
+      - run: node --check src/providers/roster-browser.js
       - run: npm test
