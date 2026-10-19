@@ -160,17 +160,37 @@ async function handle(req,res){
     if(req.method==='GET'&&route==='/api/roster'){
       const sport=url.searchParams.get('sport')||'nfl',teamId=url.searchParams.get('team')||'';
       const gameId=url.searchParams.get('game')||'';
+      const seasonRaw=url.searchParams.get('season'),season=seasonRaw===null?null:Number(seasonRaw);
+      if(season!==null&&(!Number.isInteger(season)||season<1980||season>new Date().getUTCFullYear()+2))throw Error('Invalid roster season');
       if(!espnProviders[sport]||!/^\d{1,8}$/.test(teamId))throw new Error('Invalid league or team');
       if(gameId&&!/^[0-9]{6,14}$/.test(gameId))throw new Error('Invalid game');
-      const k=`${sport}:${teamId}:${gameId}`,now=Date.now();
+      const k=`${sport}:${teamId}:${gameId}:${season||'current'}`,now=Date.now();
       let entry=rosterCache.get(k);
       const ttl=gameId?120000:1800000;
       if(!entry||now-entry.at>ttl){
-        entry={at:now,data:await espnProviders[sport].roster(teamId,{gameId})};
+        entry={at:now,data:await espnProviders[sport].roster(teamId,{gameId,season})};
         rosterCache.set(k,entry);
         if(rosterCache.size>250)rosterCache.delete(rosterCache.keys().next().value);
       }
-      return send(res,200,{players:entry.data,order:'ESPN depth chart, team leaders, game statistics; alphabetical fallback'});
+      return send(res,200,{players:entry.data,season,order:'ESPN depth chart, team leaders, game statistics; alphabetical fallback',source:'ESPN unofficial'});
+    }
+    if(req.method==='GET'&&route==='/api/roster/stats'){
+      const {sport,provider}=providerFrom(url),season=Number(url.searchParams.get('season'));
+      if(!Number.isInteger(season)||season<1980||season>new Date().getUTCFullYear()+2)throw Error('Invalid roster stats season');
+      const ids=String(url.searchParams.get('ids')||'').split(',').filter(Boolean);
+      if(!ids.length||ids.length>8||ids.some(id=>!/^[0-9]{1,14}$/.test(id))||new Set(ids).size!==ids.length)throw Error('Expected 1–8 unique player IDs');
+      const stats={},errors=[];
+      // At most four parallel ESPN game-log reads, cached for twenty minutes.
+      for(let i=0;i<ids.length;i+=4){
+        const resolved=await Promise.all(ids.slice(i,i+4).map(async id=>{
+          try{return {id,summary:await cached('rosterStats:'+sport+':'+id+':'+season,1200000,
+            ()=>provider.rosterStats(id,season))}}
+          catch(err){return {id,error:err.message||'ESPN unavailable'}}
+        }));
+        for(const item of resolved)if(item.summary)stats[item.id]=item.summary;
+        else errors.push({id:item.id,error:item.error});
+      }
+      return send(res,200,{stats,errors,season,source:'ESPN recorded game logs',note:'Per-game averages use available game logs; missing records are not inferred.'});
     }
     if(req.method==='GET'&&route==='/api/games'){
       const sport=url.searchParams.get('sport')||'nfl',date=url.searchParams.get('date')||'';
