@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {espnProviders,SPORTS} from './src/providers/espn.js';
 import {extractBoxTotals} from './src/providers/intelligence.js';
+import {analyzePlayer} from './src/providers/analytics.js';
 import {makeMonitor} from './src/engine/monitor.js';
 import {normalizeWatch,matchPlay} from './src/engine/events.js';
 import {loadStore,writeStore} from './src/engine/store.js';
@@ -46,6 +47,30 @@ function allowWrite(req){
 const teamCache=new Map(),rosterCache=new Map();
 const boxScoreCache=new Map(); // Refresh live box scores frequently without flooding ESPN.
 const insightCache=new Map();
+const analystCooldown=new Map();
+function validateAthleteSeason(url){
+  const athlete=url.searchParams.get('athlete')||'';
+  const season=Number(url.searchParams.get('season')||'0');
+  if(!/^[0-9]{1,14}$/.test(athlete))throw Error('Invalid athlete');
+  if(!Number.isInteger(season)||season<1980||season>new Date().getUTCFullYear()+2)throw Error('Invalid season');
+  return {athlete,season};
+}
+async function headshotImage(res,raw){
+  let u;try{u=new URL(raw)}catch{throw Error('Invalid image URL')}
+  if(u.protocol!=='https:'||!['a.espncdn.com','a1.espncdn.com','a2.espncdn.com','a.espn.com'].includes(u.hostname)||
+     !/^\/i\/(headshots|teamlogos)\//.test(u.pathname)||
+     u.username||u.password||u.port)throw Error('Only ESPN headshot images are supported');
+  const remote=await fetch(u,{redirect:'error',signal:AbortSignal.timeout(9000)});
+  if(!remote.ok)throw Error('Headshot unavailable');
+  const type=(remote.headers.get('content-type')||'').split(';')[0];
+  if(!['image/jpeg','image/png','image/webp'].includes(type))throw Error('Unsupported image');
+  if(Number(remote.headers.get('content-length')||0)>2500000)throw Error('Image too large');
+  const buffer=Buffer.from(await remote.arrayBuffer());
+  if(buffer.length>2500000)throw Error('Image too large');
+  res.writeHead(200,{'Content-Type':type,'Cache-Control':'public,max-age=86400','X-Content-Type-Options':'nosniff','Access-Control-Allow-Origin':'same-origin'});
+  res.end(buffer);
+}
+
 async function cached(key,ttl,fn){
  const previous=insightCache.get(key),now=Date.now();
  if(previous&&now-previous.at<ttl)return previous.data;
@@ -212,6 +237,57 @@ async function handle(req,res){
           game:box?{teams:box.teams,status:box.status,state:box.state}:null};
       });
       return send(res,200,{tracker,updatedAt:new Date().toISOString()});
+    }
+    if(req.method==='GET'&&route==='/api/analytics/player'){
+      const {sport,provider}=providerFrom(url),{athlete,season}=validateAthleteSeason(url);
+      const data=await cached('analytics:'+sport+':'+athlete+':'+season,900000,()=>provider.analyticsPlayer(athlete,season));
+      return send(res,200,{analytics:data});
+    }
+    if(req.method==='GET'&&route==='/api/analytics/search'){
+      const {sport,provider}=providerFrom(url),q=(url.searchParams.get('q')||'').trim();
+      if(q.length<2||q.length>70)throw Error('Search term must be 2–70 characters');
+      const list=await cached('athletes:'+sport+':'+q.toLowerCase(),180000,()=>provider.searchAthletes(q));
+      return send(res,200,{players:list});
+    }
+    if(req.method==='GET'&&route==='/api/analytics/headshot'){
+      return headshotImage(res,url.searchParams.get('url')||'');
+    }
+    if(req.method==='POST'&&route==='/api/analytics/analyst'){
+      const reqData=await body(req),sport=String(reqData.sport||'nba'),
+        athlete=String(reqData.athlete||''),season=Number(reqData.season),
+        metric=String(reqData.metric||'PTS').replace(/[^A-Za-z0-9%]/g,'').slice(0,18).toUpperCase();
+      if(!espnProviders[sport]||!/^[0-9]{1,14}$/.test(athlete)||
+         !Number.isInteger(season)||season<1980||season>new Date().getUTCFullYear()+2||!metric)throw Error('Invalid analyst request');
+      const data=await cached('analytics:'+sport+':'+athlete+':'+season,900000,
+        ()=>espnProviders[sport].analyticsPlayer(athlete,season));
+      const evidence=analyzePlayer(data.player,data.history.games,metric);
+      if(reqData.ai!==true)return send(res,200,{analysis:evidence,mode:'statistical'});
+      if(!process.env.OPENAI_API_KEY)return send(res,200,{analysis:evidence,mode:'statistical',warning:'AI service not configured; showing sourced statistical analysis.'});
+      const now=Date.now(),last=analystCooldown.get(ownerId)||0;
+      if(now-last<300000)throw Error('AI analysis can be requested once every five minutes.');
+      if(!evidence.sentences.length)return send(res,200,{analysis:evidence,mode:'statistical'});
+      analystCooldown.set(ownerId,now);
+      if(analystCooldown.size>1500)analystCooldown.clear();
+      const model=process.env.LIVESTAT_AI_MODEL||'gpt-4.1-mini';
+      try{
+        const ai=await fetch('https://api.openai.com/v1/responses',{
+          method:'POST',signal:AbortSignal.timeout(20000),
+          headers:{authorization:'Bearer '+process.env.OPENAI_API_KEY,'content-type':'application/json'},
+          body:JSON.stringify({
+            model,max_output_tokens:350,
+            instructions:'You are LiveStat Analyst. Explain only the supplied statistics. No invented plays, opponents, season averages, injuries, projections or quotes. Cite sample game counts and highlight uncertain coverage. Reply in 3–5 concise sentences, no markdown.',
+            input:JSON.stringify({sport,player:data.player.name,season,stat:metric,observations:evidence.sentences})
+          })
+        });
+        if(!ai.ok)throw Error('AI provider is temporarily unavailable');
+        const response=await ai.json();
+        const parts=(response.output||[]).flatMap(x=>(x.content||[]).filter(y=>y.type==='output_text').map(y=>y.text));
+        const textValue=parts.join('\n').trim().slice(0,1800);
+        if(!textValue)throw Error('No AI analysis returned');
+        return send(res,200,{mode:'ai',analysis:{...evidence,summary:textValue},model});
+      }catch{
+        return send(res,200,{mode:'statistical',analysis:evidence,warning:'AI service unavailable; showing evidence-based statistical analysis.'});
+      }
     }
     if(req.method==='POST'&&route==='/api/watches'){
       const watch=normalizeWatch(await body(req));
