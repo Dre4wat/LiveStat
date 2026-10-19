@@ -3,42 +3,68 @@ const asArray = x => Array.isArray(x) ? x : [];
 const text = x => x == null ? '' : String(x);
 const numeric = x => /^-?(?:\d+\.?\d*|\.\d+)$/.test(text(x).trim()) ? Number(x) : null;
 const key = x => text(x).trim().toUpperCase().replace(/[^A-Z0-9%]/g,'');
-export function normalizeGameLog(raw, season){
-  const events = raw?.events || {};
-  const map = new Map();
-  function add(id, stats, labels, category){
-    id=text(id); if(!id) return;
-    const meta=Array.isArray(events)?events.find(e=>text(e.id||e.eventId)===id)||{}:events[id]||{};
-    const old=map.get(id)||{
-      id, date:text(meta.gameDate||meta.date||meta.eventDate),
-      opponent:text(meta.opponent?.displayName||meta.opponent?.abbreviation||meta.opponent?.name||meta.opponent||''),
-      result:text(meta.gameResult||meta.result),score:text(meta.score?.displayValue||meta.score||''),
-      stats:{},groups:{},season:Number(season)
-    };
-    asArray(labels).forEach((label,i)=>{
-      const k=key(label),v=numeric(stats?.[i]);
-      if(k && v!==null && !Object.hasOwn(old.stats,k))old.stats[k]=v;
+export function normalizeGameLog(raw,season){
+  const eventMeta=raw?.events || {};
+  const map=new Map();
+  const groups={passing:'PASS',rushing:'RUSH',receiving:'REC',defensive:'DEF',defense:'DEF',kicking:'KICK',punting:'PUNT',kickreturns:'KR',puntreturns:'PR'};
+  // ESPN's documented game-log payloads vary by sport. NBA uses top-level
+  // events[] + labels[]; football can use seasonTypes[].categories[].events[].
+  function add(entry,labels,category,idOverride){
+    const id=text(idOverride ?? entry?.eventId ?? entry?.id);
+    if(!id)return;
+    const meta=Array.isArray(eventMeta)
+      ? eventMeta.find(e=>text(e?.eventId||e?.id)===id)||{}
+      :eventMeta[id]||{};
+    const date=text(entry?.gameDate||entry?.date||entry?.eventDate||meta.gameDate||meta.date||meta.eventDate);
+    const opp=entry?.opponent||meta.opponent||{};
+    const opponent=typeof opp==='string'?opp:text(opp.displayName||opp.abbreviation||opp.name);
+    const old=map.get(id)||{id,date,opponent,result:text(entry?.gameResult||entry?.result||meta.gameResult||meta.result),
+      score:text(entry?.score?.displayValue||entry?.score||meta.score?.displayValue||meta.score),
+      stats:{},groups:{},season:Number(season)};
+    if(date&&!old.date)old.date=date;
+    if(opponent&&!old.opponent)old.opponent=opponent;
+    const values=Array.isArray(entry?.stats)?entry.stats:Array.isArray(entry?.statistics)?entry.statistics:[];
+    let heading=asArray(labels);
+    if(!heading.length&&Array.isArray(raw?.labels))heading=raw.labels;
+    // Example ESPN NBA: labels=["DATE","OPP","RESULT","MIN",...,"PTS"],
+    // while individual event.stats only contains the numeric columns.
+    if(heading.length>values.length)heading=heading.slice(heading.length-values.length);
+    if(!values.length || !heading.length)return;
+    const rawCategory=text(category||'Game Stats');
+    const prefix=groups[key(rawCategory).toLowerCase()]||'';
+    const detail={};
+    heading.forEach((label,i)=>{
+      const column=key(label),n=numeric(values[i]);
+      if(!column||n===null)return; // Non-numeric shooting splits remain raw in groups.
+      detail[text(label)]=text(values[i]);
+      if(!Object.hasOwn(old.stats,column))old.stats[column]=n;
+      // Multiple football sections reuse YDS, TD, ATT; preserve each section
+      // separately so rushing never silently becomes passing.
+      if(prefix){
+        const scoped=prefix+column;
+        if(!Object.hasOwn(old.stats,scoped))old.stats[scoped]=n;
+      }
     });
-    old.groups[text(category||'Game Stats')]=asArray(labels).reduce((o,l,i)=>{
-      if(stats?.[i]!=null)o[text(l)]=text(stats[i]);return o;
-    },{});
+    if(Object.keys(detail).length)old.groups[rawCategory]=detail;
     map.set(id,old);
   }
   for(const seasonType of asArray(raw?.seasonTypes)){
     for(const cat of asArray(seasonType.categories)){
-      for(const e of asArray(cat.events))add(e.eventId??e.id,e.stats??e.statistics,cat.labels,cat.displayName||cat.name);
+      for(const e of asArray(cat.events))add(e,cat.labels||raw?.labels,cat.displayName||cat.name);
     }
   }
   for(const cat of asArray(raw?.categories)){
-    for(const e of asArray(cat.events))add(e.eventId??e.id,e.stats??e.statistics,cat.labels,cat.displayName||cat.name);
+    for(const e of asArray(cat.events))add(e,cat.labels||raw?.labels,cat.displayName||cat.name);
   }
-  for(const e of asArray(raw?.games||raw?.gameLog)){
-    if(e.stats && !Array.isArray(e.stats)) {
-      const cols=Object.entries(e.stats);
-      add(e.eventId||e.id,cols.map(([,v])=>v),cols.map(([k])=>k),'Game Stats');
-    } else add(e.eventId||e.id,e.stats,e.labels||raw.labels,'Game Stats');
+  const direct=Array.isArray(raw?.events)?raw.events:asArray(raw?.games||raw?.gameLog);
+  for(const e of direct){
+    const values=Array.isArray(e?.stats)?e.stats:Array.isArray(e?.statistics)?e.statistics:null;
+    if(values)add(e,e.labels||raw?.labels,'Game Stats');
+    else if(e?.stats&&typeof e.stats==='object'){
+      const pairs=Object.entries(e.stats);
+      add({...e,stats:pairs.map(([,v])=>v)},pairs.map(([k])=>k),'Game Stats');
+    }
   }
-  // Do not show an event as a statistical row if the feed provided metadata but no stats.
   const rows=[...map.values()].filter(x=>Object.keys(x.stats).length);
   rows.sort((a,b)=>(Date.parse(b.date)||0)-(Date.parse(a.date)||0));
   return {season:Number(season),games:rows,labels:[...new Set(rows.flatMap(x=>Object.keys(x.stats)))],count:rows.length};
