@@ -156,3 +156,14 @@
 .ls-rank-tag{display:inline-block;background:#421722;border:1px solid #aa384c;border-radius:4px;color:#ffd3d9;padding:2px 5px;font-size:9px;margin-right:5px;letter-spacing:.4px}
 @media(max-width:670px){.ls-position-grid{grid-template-columns:1fr}.ls-position-card{min-height:80px;padding:12px}.ls-position-heading{margin-top:15px}.ls-position-text strong{font-size:13px}}
 @media(prefers-reduced-motion:reduce){.ls-position-card{transition:none}.ls-position-card:hover{transform:none}}
+
+/* Evidence-based full-game analyst */
+.ls-i-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ls-i-panel-head button{padding:10px 13px;border:1px solid #a53d51;border-radius:8px;background:#5b1b2a;color:#fff;font-weight:900;font-size:11px}
+.ls-i-analysis{padding:21px;border:1px solid #ac3c51;border-radius:12px;background:linear-gradient(120deg,#421a28,#1b121a)}
+.ls-i-analysis small{font-size:10px;letter-spacing:1px;color:#ffa0af;font-weight:850}
+.ls-i-analysis p{font-size:15px;line-height:1.8;color:#ffedf2;white-space:pre-wrap}
+.ls-i-evidence{display:flex;flex-direction:column;gap:8px}
+.ls-i-evidence>div{background:#20161c;border:1px solid #56323d;border-radius:8px;padding:11px 12px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ls-i-evidence strong{font-size:12px}
+.ls-i-evidence span{font-size:11px;color:#bb9da5}
