@@ -6,7 +6,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  const state={sport:'nba',season:yearNow+1,compareSeason:yearNow,player:null,search:'',results:[],loading:false,searching:false,error:'',
    data:null,compare:null,archive:[],tab:'dashboard',metric:null,layoutName:'My Stat Dashboard',savedLayouts:[],activeLayout:null,
    metrics:[],cardMode:'latest',cardTheme:'redline',formula:'PTS + REB + AST',formulaResult:null,
-   report:null,reportLoading:false,comparisonLoading:false,currentGame:null,current:null};
+   report:null,reportLoading:false,comparisonLoading:false,currentGame:null,current:null,archiveCursor:0,archiveStorage:null,selectedMilestone:null};
  try{if(typeof localStorage!=='undefined')state.savedLayouts=JSON.parse(localStorage.getItem('livestat-lab-layouts')||'[]')}catch{state.savedLayouts=[]}
  const motion=createAnimatedCardsStudio({
    refresh,notify:toast,
@@ -43,7 +43,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  }
  function tabs(){
   return `<div class="lab-tabs">${[
-   ['dashboard','DASHBOARD'],['history','HISTORY & TRENDS'],['seasons','SEASON COMPARISON'],
+   ['dashboard','DASHBOARD'],['history','HISTORY & TRENDS'],['seasons','SEASON COMPARISON'],['career','CAREER LAB'],
    ['cards','PLAYER CARDS'],['animated','ANIMATED CARDS'],['formula','FORMULA LAB'],['analyst','GAME ANALYST']
   ].map(([id,label])=>`<button data-action="lab-tab" data-value="${id}" class="${state.tab===id?'active':''}">${label}</button>`).join('')}</div>`;
  }
@@ -123,6 +123,22 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    ${state.archive.length?`<div class="lab-archive"><h3>HISTORICAL ARCHIVE</h3>${state.archive.map(item=>`<div><strong>${item.season}</strong><span>${item.history?.games?.length||0} recorded games</span><span>${fmt(mean(item.history?.games||[],state.metric))} ${escape(state.metric||'')}</span></div>`).join('')}</div>`:''}
    <p class="lab-muted">Game-log averages are calculated from the games ESPN returned, not assumed to be complete season totals. A season may be unavailable.</p></section>`;
  }
+ function careerView(){
+   const list=[...(state.archive||[]),state.data].filter(Boolean);
+   const seen=new Map();for(const x of list){if(x?.season!=null)seen.set(Number(x.season),x)}
+   const years=[...seen.values()].sort((a,b)=>a.season-b.season);
+   const metric=state.metric,rows=years.map(x=>{const games=x.history?.games||[];const vals=games.map(g=>Number(g.stats?.[metric])).filter((v,i)=>games[i].stats?.[metric]!=null&&Number.isFinite(v));return {year:x.season,mean:vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null,games:vals.length}}).filter(x=>x.mean!==null);
+   const peak=rows.reduce((a,b)=>a==null||b.mean>a.mean?b:a,null);
+   const max=Math.max(1,...rows.map(x=>x.mean));
+   const chart=rows.length>1?'<svg viewBox="0 0 800 260" preserveAspectRatio="none" role="img" aria-label="Career seasons: '+escape(metric)+'"><path d="M30 230 H775 M30 130 H775 M30 30 H775" stroke="#51323e" fill="none" /> <polyline fill="none" stroke="#f3465d" stroke-width="4" points="'+rows.map((x,i)=>(30+i*740/(rows.length-1)).toFixed(1)+','+(228-x.mean/max*190).toFixed(1)).join(' ')+'" />'+rows.map((x,i)=>'<circle cx="'+(30+i*740/(rows.length-1)).toFixed(1)+'" cy="'+(228-x.mean/max*190).toFixed(1)+'" r="6" fill="white"><title>'+x.year+': '+fmt(x.mean)+' ('+x.games+' games)</title></circle>').join('')+'</svg>':'<div class="lab-empty">Load another recorded season to compare career trends.</div>';
+   const mode=state.archiveStorage?.mode||state.data?.archive?.mode||'unknown';
+   return '<section class="lab-panel"><div class="lab-panel-title"><h3>CAREER HISTORY & TRENDS</h3>'+metricOptions()+'</div><p class="lab-muted">Each point is an average of ESPN games available for that season—not necessarily a complete official season.</p>'+
+     '<div class="lab-row-actions"><button data-action="lab-archive" '+(state.comparisonLoading||state.archiveCursor>=24?'disabled':'')+'>'+(state.comparisonLoading?'LOADING…':'LOAD NEXT 4 SEASONS')+'</button><span>'+rows.length+' loaded seasons · '+escape(mode)+'</span></div>'+
+     '<div class="lab-career-chart">'+chart+'</div>'+
+     (peak?'<div class="lab-summary"><div><small>BEST LOADED SEASON AVG</small><strong>'+fmt(peak.mean)+'</strong></div><div><small>SEASON</small><strong>'+peak.year+'</strong></div><div><small>GAMES IN SAMPLE</small><strong>'+peak.games+'</strong></div></div>':'')+
+     '<div class="lab-archive">'+rows.map(x=>'<div><strong>'+x.year+'</strong><span>'+x.games+' games</span><span>'+fmt(x.mean)+' '+escape(metric)+'/game</span></div>').join('')+'</div>'+
+     (mode==='ephemeral-disk'?'<p class="lab-warning">Archive files are temporary on free Render. Connect PostgreSQL (DATABASE_URL) to retain them across restarts.</p>':'')+'</section>';
+ }
  function cardAverage(metric){
    const basketball=['nba','ncaam','ncaaw'].includes(state.sport);
    if(basketball){
@@ -189,7 +205,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    if(!state.player)return `<div class="lab-root">${heading()}${chooser()}<div class="lab-empty">Choose a player from search, a saved alert, or the Arena roster to begin. Pick seasons to research recorded performances.</div></div>`;
    return `<div class="lab-root">${heading()}${chooser()}${seasonControls()}${profileTop()}${tabs()}
      ${state.loading&&!state.data?'<div class="lab-empty">Loading ESPN game logs and season statistics…</div>':
-       state.tab==='dashboard'?dashboard():state.tab==='history'?history():state.tab==='seasons'?seasons():state.tab==='cards'?cardView():state.tab==='animated'?motion.render():state.tab==='formula'?formulaView():analystView()}
+       state.tab==='dashboard'?dashboard():state.tab==='history'?history():state.tab==='seasons'?seasons():state.tab==='career'?careerView():state.tab==='cards'?cardView():state.tab==='animated'?motion.render():state.tab==='formula'?formulaView():analystView()}
      ${(state.data?.feedWarnings||[]).length?`<p class="lab-warning">${escape(state.data.feedWarnings.join(' · '))}</p>`:''}
      <p class="lab-footer">Unofficial ESPN data; availability differs across sports, players and seasons. Live predictions are not implied. Dashboard layouts are stored locally.</p></div>`;
  }
@@ -202,6 +218,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
      if(identity!==state.sport+':'+state.player?.id||year!==state.season)return;
      state.data=x.analytics;state.player={...state.player,...Object.fromEntries(Object.entries(x.analytics.player||{}).filter(([,v])=>v!=null&&v!==''))};
      ensureMetrics();state.report=null;state.formulaResult=null;
+     try{const saved=await api('/api/analytics/archive?sport='+state.sport+'&athlete='+state.player.id);state.archiveStorage=saved;}catch{state.archiveStorage=null}
      if(state.currentGame?.gameId&&state.currentGame?.teamId){
        try{
          const current=await api('/api/analytics/current?sport='+encodeURIComponent(state.sport)+'&game='+encodeURIComponent(state.currentGame.gameId)+'&team='+encodeURIComponent(state.currentGame.teamId)+'&athlete='+encodeURIComponent(state.player.id));
@@ -225,7 +242,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  function openPlayer(player,sport,context=null){
    if(!player?.id)return;
    state.sport=sport||state.sport;state.player={...player};state.currentGame=context;state.current=null;state.cardMode=context?.gameId?'live':'latest';
-   state.data=null;state.compare=null;state.archive=[];state.activeLayout=null;state.metrics=[];state.metric=null;
+   state.data=null;state.compare=null;state.archive=[];state.archiveCursor=0;state.archiveStorage=null;state.selectedMilestone=null;state.activeLayout=null;state.metrics=[];state.metric=null;
    state.tab='dashboard';state.results=[];state.search='';state.error='';
    state.season=['nba','ncaam','ncaaw'].includes(state.sport)?yearNow+(new Date().getUTCMonth()>=6?1:0):yearNow;
    state.compareSeason=state.season-1;refresh();return load();
@@ -239,11 +256,19 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    finally{state.comparisonLoading=false;refresh()}
  }
  async function archive(){
-   if(!state.player)return;state.comparisonLoading=true;refresh();
-   const years=Array.from({length:4},(_,i)=>state.season-i);
-   const result=await Promise.allSettled(years.map(y=>api('/api/analytics/player?sport='+state.sport+'&athlete='+state.player.id+'&season='+y)));
-   state.archive=result.filter(x=>x.status==='fulfilled').map(x=>x.value.analytics);
-   state.comparisonLoading=false;refresh();toast('Archive checked: '+state.archive.length+' seasons returned');
+   if(!state.player||state.comparisonLoading||state.archiveCursor>=24)return;
+   state.comparisonLoading=true;refresh();
+   const athlete=state.player.id,sport=state.sport,years=Array.from({length:4},(_,i)=>state.season-state.archiveCursor-i).filter(y=>y>=1980);
+   const result=await Promise.allSettled(years.map(y=>api('/api/analytics/player?sport='+sport+'&athlete='+athlete+'&season='+y)));
+   if(state.player?.id===athlete&&state.sport===sport){
+     const byYear=new Map(state.archive.map(x=>[x.season,x]));
+     for(const x of result)if(x.status==='fulfilled'&&x.value.analytics)byYear.set(x.value.analytics.season,x.value.analytics);
+     state.archive=[...byYear.values()].sort((a,b)=>b.season-a.season);
+     state.archiveCursor+=4;
+     const complete=result.filter(x=>x.status==='fulfilled'&&x.value.analytics?.history?.games?.length).length;
+     toast(complete+' seasons with recorded game logs added');
+   }
+   state.comparisonLoading=false;refresh();
  }
  async function report(ai=false){
    if(!state.player||!state.metric)return;
