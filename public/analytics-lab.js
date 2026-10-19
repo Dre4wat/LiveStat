@@ -142,7 +142,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  function cardView(){
    const player=state.data?.player||state.player||{};
    const cardStats=cardMetrics();
-   return `<section class="lab-panel"><div class="lab-panel-title"><h3>PLAYER CARD STUDIO</h3><span>1080 × 1350 PNG</span></div>
+   return `<section class="lab-panel"><div class="lab-panel-title"><h3>PLAYER CARD STUDIO</h3><button class="lab-motion-link" data-action="lab-tab" data-value="animated">▶ ANIMATE THIS CARD ↗</button></div>
    <div class="lab-row-actions"><label>STYLE<select id="lab-theme">${['redline','silver','midnight'].map(x=>`<option value="${x}" ${state.cardTheme===x?'selected':''}>${x.toUpperCase()}</option>`).join('')}</select></label>
    <label>CARD TYPE<select id="lab-card-mode">${[...(state.currentGame?.gameId?[['live','Selected game box score']]:[]),['latest','Latest recorded game'],['average','Game-log average'],['best','Best game in sample']].map(([id,name])=>`<option value="${id}" ${state.cardMode===id?'selected':''}>${name}</option>`).join('')}</select></label>
    <button data-action="lab-export-png">↓ DOWNLOAD PNG</button></div>
