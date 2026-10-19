@@ -6,9 +6,9 @@ import {fileURLToPath} from 'node:url';
 import {espnProviders,SPORTS} from './src/providers/espn.js';
 import {extractBoxTotals} from './src/providers/intelligence.js';
 import {analyzePlayer,analyzeGameData} from './src/providers/analytics.js';
-import {fetchOrArchivePlayer,listArchivedSeasons,archiveMode} from './src/engine/analytics-archive.js';
+import {fetchOrArchivePlayer,listArchivedSeasons,loadPlayerSeason,archiveMode} from './src/engine/analytics-archive.js';
 import {detectPlayerMilestones,detectMissionHighlights} from './src/providers/milestones.js';
-import {formAnalysis} from './src/providers/trends.js';
+import {formAnalysis,careerAnalysis} from './src/providers/trends.js';
 import {makeMonitor} from './src/engine/monitor.js';
 import {normalizeWatch,matchPlay} from './src/engine/events.js';
 import {loadStore,writeStore} from './src/engine/store.js';
@@ -264,6 +264,16 @@ async function handle(req,res){
       return send(res,200,{seasons,mode:archiveMode(),durable:archiveMode()!=='ephemeral-disk',
         note:archiveMode()==='ephemeral-disk'?'Free Render storage is temporary; connect PostgreSQL to retain seasons after restart.':null});
     }
+    if(req.method==='GET'&&route==='/api/analytics/career-report'){
+      const {sport}=providerFrom(url),athlete=url.searchParams.get('athlete')||'';
+      const metric=String(url.searchParams.get('metric')||'PTS').toUpperCase().replace(/[^A-Z0-9%]/g,'').slice(0,20);
+      if(!/^[0-9]{1,14}$/.test(athlete)||!metric)throw Error('Invalid career report request');
+      const index=await listArchivedSeasons(sport,athlete);
+      const seasons=(await Promise.all(index.slice(0,30).map(x=>loadPlayerSeason(sport,athlete,x.season).catch(()=>null))))
+        .filter(Boolean).map(x=>x.data);
+      return send(res,200,{analysis:careerAnalysis(seasons,metric),seasonCount:seasons.length,
+        mode:archiveMode(),disclaimer:'Available archived ESPN game logs; missing years are not filled in.'});
+    }
     if(req.method==='GET'&&route==='/api/analytics/search'){
       const {sport,provider}=providerFrom(url),q=(url.searchParams.get('q')||'').trim();
       if(q.length<2||q.length>70)throw Error('Search term must be 2–70 characters');
@@ -289,8 +299,18 @@ async function handle(req,res){
         return row?[{name:section.name,labels:section.labels,values:row.stats}]:[];
       });
       const stats=extractBoxTotals(box,{sport,kind:'player',teamId:team,playerId:athlete});
+      const aliases={points:'PTS',rebounds:'REB',assists:'AST',steals:'STL',blocks:'BLK',
+        passingYards:'PASSYDS',passingTouchdowns:'PASSTD',rushingYards:'RUSHYDS',
+        rushingTouchdowns:'RUSHTD',receivingYards:'RECYDS',receivingTouchdowns:'RECTD',
+        receptions:'REC',tackles:'DEFTOT',sacks:'DEFSACKS',interceptionsCaught:'DEFINT'};
+      const normalized=Object.fromEntries(Object.entries(stats).map(([key,val])=>[aliases[key]||key.toUpperCase(),val]));
+      const currentGame={id:game,stats:normalized,date:'',opponent:box.teams?.find(t=>String(t.id)!==team)?.name||''};
+      const milestones=detectPlayerMilestones(sport,[currentGame]).map(x=>({...x,source:'ESPN box score'}));
+      const watch=state.watches.find(w=>w.ownerId===ownerId&&w.kind==='player'&&w.sport===sport&&
+        String(w.playerId)===athlete&&String(w.gameId)===game);
+      const missions=watch?detectMissionHighlights([currentGame],watch.rules):[];
       return send(res,200,{current:{sport,gameId:game,athlete,team,state:box.state,status:box.status,
-        stats,sections,available:sections.length>0&&Object.keys(stats).length>0,source:'ESPN box score'}});
+        stats,sections,milestones,missions,available:sections.length>0&&Object.keys(stats).length>0,source:'ESPN box score'}});
     }
     if(req.method==='GET'&&route==='/api/analytics/headshot'){
       return headshotImage(res,url.searchParams.get('url')||'');
