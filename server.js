@@ -6,6 +6,8 @@ import {fileURLToPath} from 'node:url';
 import {espnProviders,SPORTS} from './src/providers/espn.js';
 import {extractBoxTotals} from './src/providers/intelligence.js';
 import {analyzePlayer,analyzeGameData} from './src/providers/analytics.js';
+import {fetchOrArchivePlayer,listArchivedSeasons,archiveMode} from './src/engine/analytics-archive.js';
+import {detectPlayerMilestones,detectMissionHighlights} from './src/providers/milestones.js';
 import {makeMonitor} from './src/engine/monitor.js';
 import {normalizeWatch,matchPlay} from './src/engine/events.js';
 import {loadStore,writeStore} from './src/engine/store.js';
@@ -47,6 +49,11 @@ function allowWrite(req){
 const teamCache=new Map(),rosterCache=new Map();
 const boxScoreCache=new Map(); // Refresh live box scores frequently without flooding ESPN.
 const insightCache=new Map();
+
+async function getHistoricalPlayer(sport,athlete,season,{refresh=false}={}){
+  return cached('analytics:v2:'+sport+':'+athlete+':'+season,refresh?1000:45000,
+    ()=>fetchOrArchivePlayer(sport,athlete,season,()=>espnProviders[sport].analyticsPlayer(athlete,season),{refresh}));
+}
 const analystCooldown=new Map();
 let aiBudgetDay='',aiUsesToday=0;
 function validateAthleteSeason(url){
@@ -241,8 +248,20 @@ async function handle(req,res){
     }
     if(req.method==='GET'&&route==='/api/analytics/player'){
       const {sport,provider}=providerFrom(url),{athlete,season}=validateAthleteSeason(url);
-      const data=await cached('analytics:'+sport+':'+athlete+':'+season,900000,()=>provider.analyticsPlayer(athlete,season));
-      return send(res,200,{analytics:data});
+      const refresh=url.searchParams.get('refresh')==='1';
+      const data=await getHistoricalPlayer(sport,athlete,season,{refresh});
+      const watch=state.watches.find(w=>w.ownerId===ownerId&&w.kind==='player'&&w.sport===sport&&String(w.playerId)===athlete);
+      const milestones=detectPlayerMilestones(sport,data.history?.games||[]);
+      const missions=watch?detectMissionHighlights(data.history?.games||[],watch.rules):[];
+      return send(res,200,{analytics:{...data,milestones,missions}});
+
+    }
+    if(req.method==='GET'&&route==='/api/analytics/archive'){
+      const {sport}=providerFrom(url),athlete=url.searchParams.get('athlete')||'';
+      if(!/^[0-9]{1,14}$/.test(athlete))throw Error('Invalid athlete');
+      const seasons=await listArchivedSeasons(sport,athlete).catch(()=>[]);
+      return send(res,200,{seasons,mode:archiveMode(),durable:archiveMode()!=='ephemeral-disk',
+        note:archiveMode()==='ephemeral-disk'?'Free Render storage is temporary; connect PostgreSQL to retain seasons after restart.':null});
     }
     if(req.method==='GET'&&route==='/api/analytics/search'){
       const {sport,provider}=providerFrom(url),q=(url.searchParams.get('q')||'').trim();
@@ -281,10 +300,9 @@ async function handle(req,res){
         metric=String(reqData.metric||'PTS').replace(/[^A-Za-z0-9%]/g,'').slice(0,18).toUpperCase();
       if(!espnProviders[sport]||!/^[0-9]{1,14}$/.test(athlete)||
          !Number.isInteger(season)||season<1980||season>new Date().getUTCFullYear()+2||!metric)throw Error('Invalid analyst request');
-      const data=await cached('analytics:'+sport+':'+athlete+':'+season,900000,
-        ()=>espnProviders[sport].analyticsPlayer(athlete,season));
+      const data=await getHistoricalPlayer(sport,athlete,season);
       const evidence=analyzePlayer(data.player,data.history.games,metric);
-      if(reqData.ai!==true)return send(res,200,{analysis:evidence,mode:'statistical'});
+      if(reqData.ai!==true)return send(res,200,{analysis:evidence,mode:'statistical',historySource:data.archive||null});
       if(!process.env.OPENAI_API_KEY)return send(res,200,{analysis:evidence,mode:'statistical',warning:'AI service not configured; showing sourced statistical analysis.'});
       const now=Date.now(),last=analystCooldown.get(ownerId)||0;
       if(now-last<300000)throw Error('AI analysis can be requested once every five minutes.');
