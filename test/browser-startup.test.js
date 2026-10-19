@@ -52,7 +52,7 @@ test('LiveStat boots with main content and can navigate to Analytics on mobile',
     assert.equal(typeof app.listeners.click,'function');
     const navBtn={dataset:{action:'nav',tab:'analytics'}};
     await app.listeners.click({target:{closest:()=>navBtn}});
-    assert.match(app.innerHTML,/ANALYTICS LAB/i);
+    assert.match(app.innerHTML,/ANALYTICS\s*<em>LAB<\/em>/i);
     const homeBtn={dataset:{action:'nav',tab:'arena'}};
     await app.listeners.click({target:{closest:()=>homeBtn}});
     assert.match(app.innerHTML,/SELECT YOUR ARENA/i);
