@@ -1,3 +1,4 @@
+import {createAnimatedCardsStudio} from './animated-cards.js';
 export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],calculateFormula}){
  const yearNow=new Date().getUTCFullYear();
  const sports={nba:'NBA',nfl:'NFL',cfb:'College Football',ncaam:"Men's College Basketball",ncaaw:"Women's College Basketball"};
@@ -7,6 +8,20 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    metrics:[],cardMode:'latest',cardTheme:'redline',formula:'PTS + REB + AST',formulaResult:null,
    report:null,reportLoading:false,comparisonLoading:false,currentGame:null,current:null};
  try{if(typeof localStorage!=='undefined')state.savedLayouts=JSON.parse(localStorage.getItem('livestat-lab-layouts')||'[]')}catch{state.savedLayouts=[]}
+ const motion=createAnimatedCardsStudio({
+   refresh,notify:toast,
+   getData:()=>{
+     const player={...state.player,...(state.data?.player||{})};
+     const matching=getWatches().find(w=>w.kind==='player'&&String(w.playerId)===String(player.id)&&w.sport===state.sport&&
+        (!state.currentGame?.gameId||String(w.gameId)===String(state.currentGame.gameId)));
+     return {
+       player,sport:state.sport,season:state.season,
+       games:state.data?.history?.games||[],
+       labels:state.data?.history?.labels||[],
+       current:state.current,watchRules:matching?.rules||{}
+     };
+   }
+ });
  const fmt=(n,places=1)=>n==null?'—':Number(n).toFixed(places).replace(/\.0$/,'');
  const rows=()=>state.data?.history?.games||[];
  const labels=()=>state.data?.history?.labels||[];
@@ -29,7 +44,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  function tabs(){
   return `<div class="lab-tabs">${[
    ['dashboard','DASHBOARD'],['history','HISTORY & TRENDS'],['seasons','SEASON COMPARISON'],
-   ['cards','PLAYER CARDS'],['formula','FORMULA LAB'],['analyst','GAME ANALYST']
+   ['cards','PLAYER CARDS'],['animated','ANIMATED CARDS'],['formula','FORMULA LAB'],['analyst','GAME ANALYST']
   ].map(([id,label])=>`<button data-action="lab-tab" data-value="${id}" class="${state.tab===id?'active':''}">${label}</button>`).join('')}</div>`;
  }
  function chooser(){
@@ -161,7 +176,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    if(!state.player)return `<div class="lab-root">${heading()}${chooser()}<div class="lab-empty">Choose a player from search, a saved alert, or the Arena roster to begin. Pick seasons to research recorded performances.</div></div>`;
    return `<div class="lab-root">${heading()}${chooser()}${seasonControls()}${profileTop()}${tabs()}
      ${state.loading&&!state.data?'<div class="lab-empty">Loading ESPN game logs and season statistics…</div>':
-       state.tab==='dashboard'?dashboard():state.tab==='history'?history():state.tab==='seasons'?seasons():state.tab==='cards'?cardView():state.tab==='formula'?formulaView():analystView()}
+       state.tab==='dashboard'?dashboard():state.tab==='history'?history():state.tab==='seasons'?seasons():state.tab==='cards'?cardView():state.tab==='animated'?motion.render():state.tab==='formula'?formulaView():analystView()}
      ${(state.data?.feedWarnings||[]).length?`<p class="lab-warning">${escape(state.data.feedWarnings.join(' · '))}</p>`:''}
      <p class="lab-footer">Unofficial ESPN data; availability differs across sports, players and seasons. Live predictions are not implied. Dashboard layouts are stored locally.</p></div>`;
  }
@@ -273,6 +288,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    refresh();
  }
  function handle(action,node){
+   if(motion.handle(action,node))return true;
    const v=node.dataset.value;
    if(action==='lab-tab'){state.tab=v;refresh();return true}
    if(action==='lab-search'){search();return true}
@@ -298,6 +314,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    return false;
  }
  function input(node){
+   if(motion.input(node))return true;
    const v=node.value;
    if(node.id==='lab-search'){state.search=v;return true}
    if(node.id==='lab-sport'){state.sport=v;state.results=[];state.data=null;state.player=null;state.metrics=[];state.season=yearNow;refresh();return true}
@@ -316,5 +333,5 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    }
    return false;
  }
- return {state,render,openPlayer,handle,input,load};
+ return {state,render,openPlayer,handle,input,load,afterRender:()=>{if(state.tab==='animated')motion.afterRender()}};
 }
