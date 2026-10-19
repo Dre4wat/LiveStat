@@ -40,6 +40,28 @@ The studio reuses **current ESPN box-score statistics, historical game logs, rea
 
 Files: `public/animated-cards.js`, `public/analytics-lab.js`, `public/analytics-lab.css`; with updated PWA cache, interface entry, and `test/animated-cards.test.js`. This was added directly to the current v1.2+ GitHub repository; the separately generated old v0.8 ZIP is obsolete and **must not replace** the live site.
 
+## Gamepoint-style multi-sport Team Roster Explorer
+
+**Rosters** is now a dedicated tab in desktop and mobile navigation, inspired by the roster UI in your Gamepoint project. It does **not** replace Arena's existing position-first player selection for game alerts.
+
+1. Choose **NFL, NBA, College Football, Men's College Basketball or Women's College Basketball**.
+2. Select a season and team. ESPN's roster API is queried with the selected `season` year.
+3. See a Gamepoint-style featured-player panel with ESPN headshot when available, jersey, position, age, listed college, height, weight, experience and recorded season stats.
+4. Select another roster row to update that panel; filter by position group or search a name or jersey.
+5. View sport-specific, horizontally scrollable stat tables; select column headers to sort using available numbers. Basketball defaults to **per-game** sample averages; football defaults to **season totals**, with a selector to switch between them.
+6. Open **Career & Season Stats** to see that player in Analytics Lab, or **Create Player Alert** to begin choosing a game in Arena.
+
+The roster loads before the statistics finish; small cached batches fetch ESPN game logs for up to eight athletes at a time. **Load More Player Stats** fetches additional rows without blocking the browser. For college sports, some teams, older seasons, jersey data, profiles or player statistics may be unavailable.
+
+**Data quality:** unlike Gamepoint's locally stored historical Basketball-Reference data, LiveStat relies on ESPN's unofficial APIs. `?season=YYYY` is passed to ESPN for team rosters, but ESPN may provide incomplete or current rosters for historical years; an old-season roster should not be presented as a guaranteed verified historical snapshot. Sample stats are calculated only from returned games, not from a complete official career dataset. Unavailable stats show an em dash.
+
+Routes:
+- `GET /api/roster?sport=nba&team=13&season=2026` (previous game-based use remains supported)
+- `GET /api/roster/stats?sport=nba&season=2026&ids=1966,3945274` (at most eight unique athletes per request)
+- `GET /api/teams?sport=nba`
+
+Browser files: `public/roster-browser.js`, `public/roster-browser.css`; provider rules: `src/providers/roster-browser.js`; regression suite: `test/roster-browser.test.js`.
+
 ## LiveStat Analytics Lab (v1.2)
 
 Access **Analytics** from the desktop sidebar or iPhone bottom navigation. You can also open it from a selected player's Arena alert-loadout screen or from a saved player watch.
