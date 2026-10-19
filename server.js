@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {espnProviders,SPORTS} from './src/providers/espn.js';
 import {extractBoxTotals} from './src/providers/intelligence.js';
-import {analyzePlayer} from './src/providers/analytics.js';
+import {analyzePlayer,analyzeGameData} from './src/providers/analytics.js';
 import {makeMonitor} from './src/engine/monitor.js';
 import {normalizeWatch,matchPlay} from './src/engine/events.js';
 import {loadStore,writeStore} from './src/engine/store.js';
@@ -248,6 +248,14 @@ async function handle(req,res){
       if(q.length<2||q.length>70)throw Error('Search term must be 2–70 characters');
       const list=await cached('athletes:'+sport+':'+q.toLowerCase(),180000,()=>provider.searchAthletes(q));
       return send(res,200,{players:list});
+    }
+    if(req.method==='GET'&&route==='/api/analytics/game'){
+      const {sport,provider}=providerFrom(url),game=safeGame(url);
+      const [insights,box]=await Promise.all([
+        cached('intel:'+sport+':'+game,18000,()=>provider.intelligence(game)),
+        cached('current:'+sport+':'+game,18000,()=>provider.boxScore(game))
+      ]);
+      return send(res,200,{analysis:analyzeGameData(insights,box),sport,gameId:game});
     }
     if(req.method==='GET'&&route==='/api/analytics/current'){
       const {sport,provider}=providerFrom(url),game=safeGame(url);
