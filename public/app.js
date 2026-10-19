@@ -177,7 +177,7 @@ async function testPush(){if(s.preview)return toast('Demo only — notifications
 app.addEventListener('click',async e=>{const b=e.target.closest('button[data-action]');if(!b)return;const a=b.dataset.action;
 if(intelligence.handle(a,b))return;
 if(analytics.handle(a,b))return;
-if(a==='labfromplayer'&&s.player){s.tab='analytics';analytics.openPlayer(s.player,s.sport,{gameId:s.game?.id,teamId:s.team?.id});render();return}
+if(a==='labfromplayer'&&s.player){s.tab='analytics';analytics.openPlayer(s.player,s.sport,{gameId:s.game?.id,teamId:s.team?.id,team:s.team,game:s.game});render();return}
 if(a==='labfromwatch'){const w=s.watchList.find(w=>w.id===b.dataset.id);if(w?.playerId){s.tab='analytics';analytics.openPlayer({id:w.playerId,name:w.name,position:w.position},w.sport,{gameId:w.gameId,teamId:w.teamId});render()}return}
 if(a==='intelgame'){
  const game=(s.games||[]).find(g=>String(g.id)===String(b.dataset.game));
