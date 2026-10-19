@@ -19,4 +19,8 @@ jobs:
       - run: node --check public/intelligence-ui.js
       - run: node --check src/providers/intelligence.js
       - run: node --check src/engine/discord.js
+      - run: node --check src/providers/analytics.js
+      - run: node --check public/analytics-lab.js
+      - run: node --check public/analytics-card.js
+      - run: node --check public/formula.js
       - run: npm test
