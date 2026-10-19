@@ -47,3 +47,20 @@ test('No phantom rows from event metadata without stats',()=>{
   const raw={events:[{id:'401123',date:'2025-12-01',opponent:{abbreviation:'LAL'}}],labels:['PTS','REB']};
   assert.equal(normalizeGameLog(raw,2025).count,0);
 });
+
+test('Player Cards prefer identifiable ESPN basketball season averages over incomplete sample averages',async()=>{
+  const {createAnalyticsLab}=await import('../public/analytics-lab.js');
+  const {calculateFormula}=await import('../public/formula.js');
+  const gamelog={games:[{id:'g1',date:'2025-04-01',stats:{PTS:40,REB:7,AST:5}}],labels:['PTS','REB','AST']};
+  const seasonStats={categories:[{name:'General',values:{PTS:27.2,REB:6.8,AST:7.1}}]};
+  const api=async pathname=>{
+    if(pathname.includes('/api/analytics/player'))return {analytics:{player:{id:'1966',name:'LeBron James'},history:gamelog,seasonStats,feedWarnings:[]}};
+    throw Error('Unexpected request');
+  };
+  const lab=createAnalyticsLab({api,refresh:()=>{},toast:()=>{},getWatches:()=>[],calculateFormula});
+  await lab.openPlayer({id:'1966',name:'LeBron James'},'nba');
+  lab.handle('lab-tab',{dataset:{value:'cards'}});
+  const markup=lab.render();
+  assert.match(markup,/ESPN SEASON AVG 27\.2/);
+  assert.doesNotMatch(markup,/SAMPLE AVG 40/);
+});
