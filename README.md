@@ -2,6 +2,30 @@
 
 Cinematic black/red/white sports alerts prototype. Five leagues: NFL, NBA, college football, NCAA men's basketball and NCAA women's basketball. **No private code is needed**; the app opens directly to Select Sport.
 
+## Completed player intelligence upgrades (v1.4)
+
+### Automatic special Player Cards
+**Analytics Lab → Player Cards** now detects recorded performance highlights without manual entry. Supported examples include 40-point basketball games, triple-doubles, 300-yard passing games, 100-yard rushing/receiving performances, defensive sacks/interceptions, and your saved stat-goal missions. Choose a highlight, then download the existing 1080×1350 stat card PNG. The card displays the *recorded game values*, player headshot when supplied by ESPN, and season/sample average comparisons where available. The same highlight selection can be previewed in Player Card Studio; this is **not a licensed game-video generator**.
+
+Live game box-score milestones and saved-goal completion are also detected when visiting the player from an Arena game. Cards are never marked "career high" without complete career records. Some defensive or college statistics may be unavailable from ESPN; unavailable data is not invented.
+
+### Full Career Lab
+The **Career Lab** tab shows a season-by-season average chart and table for the statistic you select. Use **Load Next 4 Seasons** repeatedly to request older seasons (up to 24 additional years in this version). The app only displays seasons ESPN returns, with the actual available-game sample size clearly marked. Season comparisons, the regular history table and CSV export remain available.
+
+The **Player Analyst → Career Report** button compares *previously archived* season snapshots. The existing game-form analyst now adds recent-vs-prior samples, value ranges and consistency observations backed by game-log values. The optional AI explanation requires `OPENAI_API_KEY`; the no-cost statistics-only analyst works without it.
+
+### Historical archive: how durable storage works
+The new `src/engine/analytics-archive.js` saves player-season snapshots as they are requested, reads already saved historic seasons without repeatedly contacting ESPN, and falls back to retained snapshots if ESPN fails.
+
+- **Default current Render Free deployment:** archives go to the local `data/analytics` directory and **are lost if Render restarts or redeploys**. This is a working temporary archive, **not a permanent database**.
+- **Permanent PostgreSQL archive:** provision a reachable PostgreSQL database and set `DATABASE_URL` in Render Environment (never in GitHub). LiveStat automatically creates a `livestat_player_seasons` table and writes/reads archived season snapshots. The `pg` dependency is included. If the database requires an external CA, configure TLS according to the host's guidance. `PGSSL_REJECT_UNAUTHORIZED=false` is available for development only and weakens TLS checks; avoid it in production.
+- **Persistent-disk alternative:** point `LIVESTAT_DATA_DIR` at a Render persistent volume, if one is available on your plan. A plain environment variable pointing to the normal free filesystem does not create permanent storage.
+
+Past seasons are preserved **after they are requested**; the app does not automatically own all ESPN history or backfill all seasons while the free service sleeps. This archive retains processed ESPN records rather than purchasing a licensed historical sports database.
+
+### Verification & limitations
+GitHub Actions runs the browser startup regression, archival read/write and offline-provider fallback, football/basketball performance milestones, correct mission completion, form analysis, and Career Lab rendering. These tests do not guarantee a real ESPN feed is populated or that the Render deployment has completed. Live browser testing on iPhone is still needed.
+
 ## Animated Stat Cards Studio — direct GitHub implementation
 
 Open **Analytics Lab**, choose a player with recorded ESPN statistics, then select **Animated Cards** or **Player Cards → Animate this Card**. Three templates are available:
