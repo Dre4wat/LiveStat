@@ -5,7 +5,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  const state={sport:'nba',season:yearNow+1,compareSeason:yearNow,player:null,search:'',results:[],loading:false,searching:false,error:'',
    data:null,compare:null,archive:[],tab:'dashboard',metric:null,layoutName:'My Stat Dashboard',savedLayouts:[],activeLayout:null,
    metrics:[],cardMode:'latest',cardTheme:'redline',formula:'PTS + REB + AST',formulaResult:null,
-   report:null,reportLoading:false,comparisonLoading:false,currentGame:null};
+   report:null,reportLoading:false,comparisonLoading:false,currentGame:null,current:null};
  try{if(typeof localStorage!=='undefined')state.savedLayouts=JSON.parse(localStorage.getItem('livestat-lab-layouts')||'[]')}catch{state.savedLayouts=[]}
  const fmt=(n,places=1)=>n==null?'—':Number(n).toFixed(places).replace(/\.0$/,'');
  const rows=()=>state.data?.history?.games||[];
@@ -110,22 +110,32 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  }
  function cardMetrics(){
    const list=rows(),last=list[0],avail=labels();
+   if(state.cardMode==='live'){
+     if(!state.current?.available)return [];
+     const data=state.current.stats||{};
+     const favored=['points','rebounds','assists','threePointers','passingYards','passingTouchdowns','rushingYards','rushingTouchdowns','receivingYards','receptions','tackles','sacks','interceptionsCaught','forcedFumbles'];
+     const entries=Object.keys(data).sort((a,b)=>favored.indexOf(a)<0?1:favored.indexOf(b)<0?-1:favored.indexOf(a)-favored.indexOf(b)).slice(0,4);
+     const labels={points:'PTS',rebounds:'REB',assists:'AST',threePointers:'3PM',passingYards:'PASS YDS',passingTouchdowns:'PASS TD',
+       rushingYards:'RUSH YDS',rushingTouchdowns:'RUSH TD',receivingYards:'REC YDS',receptions:'REC',tackles:'TACKLES',sacks:'SACKS',interceptionsCaught:'INT'};
+     const lookup={points:'PTS',rebounds:'REB',assists:'AST',threePointers:'3PM',tackles:'TOT',sacks:'SACKS',receptions:'REC'};
+     return entries.map(k=>({label:labels[k]||k,value:data[k],avg:lookup[k]?fmt(mean(list,lookup[k])):null}));
+   }
    const selected=(currentMetrics().length?currentMetrics():avail).slice(0,4);
    const best=state.cardMode==='best'?list.reduce((a,b)=>b.stats?.[state.metric]>a?.stats?.[state.metric]?b:a,last):last;
-   return selected.map(k=>({label:k,value:state.cardMode==='average'?fmt(mean(list,k)):best?.stats?.[k]??null}));
+   return selected.map(k=>({label:k,value:state.cardMode==='average'?fmt(mean(list,k)):best?.stats?.[k]??null,avg:fmt(mean(list,k))}));
  }
  function cardView(){
    const player=state.data?.player||state.player||{};
    const cardStats=cardMetrics();
    return `<section class="lab-panel"><div class="lab-panel-title"><h3>PLAYER CARD STUDIO</h3><span>1080 × 1350 PNG</span></div>
    <div class="lab-row-actions"><label>STYLE<select id="lab-theme">${['redline','silver','midnight'].map(x=>`<option value="${x}" ${state.cardTheme===x?'selected':''}>${x.toUpperCase()}</option>`).join('')}</select></label>
-   <label>CARD TYPE<select id="lab-card-mode">${[['latest','Latest recorded game'],['average','Game-log average'],['best','Best game in sample']].map(([id,name])=>`<option value="${id}" ${state.cardMode===id?'selected':''}>${name}</option>`).join('')}</select></label>
+   <label>CARD TYPE<select id="lab-card-mode">${[...(state.currentGame?.gameId?[['live','Selected game box score']]:[]),['latest','Latest recorded game'],['average','Game-log average'],['best','Best game in sample']].map(([id,name])=>`<option value="${id}" ${state.cardMode===id?'selected':''}>${name}</option>`).join('')}</select></label>
    <button data-action="lab-export-png">↓ DOWNLOAD PNG</button></div>
    <div class="lab-card-preview theme-${escape(state.cardTheme)}"><div class="lab-card-brand">LIVE<span>STAT</span><small>PERFORMANCE CARD</small></div>
     <div class="lab-card-hero">${player.headshot?`<img alt="" src="/api/analytics/headshot?url=${encodeURIComponent(player.headshot)}" onerror="this.style.display='none'" />`:''}<div><small>${escape(player.team||'TEAM DATA UNAVAILABLE')}</small><h2>${escape(player.name||'PLAYER')}</h2><p>${escape(player.position||sports[state.sport])}</p></div></div>
-    <div class="lab-card-metrics">${cardStats.map(x=>`<div><strong>${escape(x.value??'—')}</strong><small>${escape(x.label)}</small></div>`).join('')}</div>
+    <div class="lab-card-metrics">${cardStats.map(x=>`<div><strong>${escape(x.value??'—')}</strong><small>${escape(x.label)}</small>${x.avg!=null?`<small>AVG ${escape(x.avg)}</small>`:''} </div>`).join('')}</div>
     <footer>ESPN UNOFFICIAL · ${escape(state.season)} · ${escape(state.cardMode.toUpperCase())}</footer></div>
-   <p class="lab-muted">Uses the latest recorded performance, sample average or best recorded game, not invented live statistics. Player photo only when ESPN provides one.</p></section>`;
+   <p class="lab-muted">${state.cardMode==='live'?(state.current?.available?'From selected-game ESPN box score · '+escape(state.current.status||'Game status unavailable'):'No selected-game box-score stats available yet.'):'Based on recorded games. AVG values reflect the available sample, not necessarily the full season.'} Headshots appear only when provided by ESPN.</p></section>`;
  }
  function formulaView(){
    const game=latest(),res=state.formulaResult;
@@ -164,6 +174,12 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
      if(identity!==state.sport+':'+state.player?.id||year!==state.season)return;
      state.data=x.analytics;state.player={...state.player,...Object.fromEntries(Object.entries(x.analytics.player||{}).filter(([,v])=>v!=null&&v!==''))};
      ensureMetrics();state.report=null;state.formulaResult=null;
+     if(state.currentGame?.gameId&&state.currentGame?.teamId){
+       try{
+         const current=await api('/api/analytics/current?sport='+encodeURIComponent(state.sport)+'&game='+encodeURIComponent(state.currentGame.gameId)+'&team='+encodeURIComponent(state.currentGame.teamId)+'&athlete='+encodeURIComponent(state.player.id));
+         if(identity===state.sport+':'+state.player?.id&&year===state.season)state.current=current.current;
+       }catch{state.current=null}
+     }
    }catch(e){state.error=e.message||String(e);state.data=null;toast(state.error)}
    finally{state.loading=false;refresh()}
  }
@@ -180,7 +196,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  }
  function openPlayer(player,sport,context=null){
    if(!player?.id)return;
-   state.sport=sport||state.sport;state.player={...player};state.currentGame=context;
+   state.sport=sport||state.sport;state.player={...player};state.currentGame=context;state.current=null;state.cardMode=context?.gameId?'live':'latest';
    state.data=null;state.compare=null;state.archive=[];state.activeLayout=null;state.metrics=[];state.metric=null;
    state.tab='dashboard';state.results=[];state.search='';state.error='';
    state.season=['nba','ncaam','ncaaw'].includes(state.sport)?yearNow+(new Date().getUTCMonth()>=6?1:0):yearNow;
@@ -236,13 +252,14 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    setTimeout(()=>URL.revokeObjectURL(url),10000);
  }
  async function png(){
-   if(!state.data||!rows().length)return toast('No recorded stats for a card');
+   if(!state.data||(!rows().length&&state.cardMode!=='live'))return toast('No recorded stats for a card');
+   if(state.cardMode==='live'&&!state.current?.available)return toast('Selected-game box score not available yet');
    try{
      const {exportPlayerCard}=await import('./analytics-card.js');
      const player={...state.player,...state.data.player};
      const metrics=cardMetrics();
      await exportPlayerCard({player,sport:state.sport,season:state.season,theme:state.cardTheme,metrics,
-       title:state.cardMode==='average'?'GAME LOG AVERAGE':state.cardMode==='best'?'SEASON BEST':'LATEST RECORDED GAME',
+       title:state.cardMode==='live'?'SELECTED GAME BOX SCORE':state.cardMode==='average'?'GAME LOG AVERAGE':state.cardMode==='best'?'SEASON BEST':'LATEST RECORDED GAME',
        filename:'livestat-'+state.player.name+'-'+state.season});
      toast('Player card PNG created');
    }catch(e){toast(e.message||'Card export failed')}
