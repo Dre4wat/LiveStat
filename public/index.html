@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#09090c" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description" content="LiveStat Arena — game-first NFL, NBA and college sports stat alerts." />
+  <meta name="description" content="LiveStat Arena & Analytics Lab — player history, live games, custom dashboards and sports stat alerts." />
   <title>LiveStat // Arena</title>
   <link rel="manifest" href="/manifest.json" /><link rel="apple-touch-icon" href="/icon-192.png" />
-  <link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/cinematic.css" /><link rel="stylesheet" href="/boxscore.css" /><link rel="stylesheet" href="/intelligence.css" />
+  <link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/cinematic.css" /><link rel="stylesheet" href="/boxscore.css" /><link rel="stylesheet" href="/intelligence.css" /><link rel="stylesheet" href="/analytics-lab.css" />
 </head>
 <body>
   <div class="shell">
@@ -21,10 +21,11 @@
       <button class="side-item" data-action="nav" data-tab="activity"><span class="side-icon">▥</span> Live Activity</button>
       <button class="side-item" data-action="nav" data-tab="command"><span class="side-icon">▣</span> Command Center</button>
       <button class="side-item" data-action="nav" data-tab="league"><span class="side-icon">▤</span> League Center</button>
+      <button class="side-item" data-action="nav" data-tab="analytics"><span class="side-icon">◈</span> Analytics Lab <span class="side-arrow">↗</span></button>
       <button class="side-item" data-action="nav" data-tab="settings"><span class="side-icon">⚙</span> Settings</button>
       <div class="side-spacer"></div>
       <div class="side-card"><span class="status-beam"></span><small>THE CONTROL ROOM</small><strong>Your players.<br/>Your moments.</strong><span>One alert per play. Milestones when they matter.</span></div>
-      <div class="side-foot">LIVESTAT / V0.9 <span>● FREE DATA</span></div>
+      <div class="side-foot">LIVESTAT / V1.2 <span>● FREE DATA</span></div>
     </aside>
     <div class="main-shell">
       <header class="top-bar">
@@ -41,6 +42,7 @@
     <button class="mobile-nav-item" data-action="nav" data-tab="watches"><span>◎</span><small>Alerts</small></button>
     <button class="mobile-nav-item" data-action="nav" data-tab="activity"><span>▥</span><small>Activity</small></button>
     <button class="mobile-nav-item" data-action="nav" data-tab="command"><span>▣</span><small>Command</small></button>
+    <button class="mobile-nav-item" data-action="nav" data-tab="analytics"><span>◉</span><small>Analytics</small></button>
     <button class="mobile-nav-item" data-action="nav" data-tab="settings"><span>⚙</span><small>Settings</small></button>
   </nav>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
