@@ -9,7 +9,7 @@ test('Gamepoint roster layout has unique sport-specific stat columns',()=>{
  assert.deepEqual(gridColumns('ncaaw','ALL'),gridColumns('nba','ALL'));
  assert.deepEqual(gridColumns('cfb','QB'),['PASSYDS','PASSTD','PASSINT','CMP','RUSHYDS','RUSHTD']);
  assert.deepEqual(gridColumns('nfl','DL'),['DEFTOT','DEFSACKS','DEFINT']);
- assert.deepEqual(rosterColumns('nfl','WR'),['REC','RECYDS','RECTD','TGTS','YPR']);
+ assert.deepEqual(rosterColumns('nfl','WR'),['REC','RECYDS','RECTD','TGTS','YPR','RUSHYDS']);
 });
 test('season defaults follow NBA/NCAA calendar and football',()=>{
  assert.equal(defaultRosterSeason('nfl',new Date('2026-10-19')),2026);
