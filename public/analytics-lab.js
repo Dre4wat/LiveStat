@@ -1,4 +1,4 @@
-export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[]}){
+export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],calculateFormula}){
  const yearNow=new Date().getUTCFullYear();
  const sports={nba:'NBA',nfl:'NFL',cfb:'College Football',ncaam:"Men's College Basketball",ncaaw:"Women's College Basketball"};
  const escape=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -251,7 +251,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[]})
    const base=latest()?.stats||{};
    try{
      // Imported pure parser through the main browser module.
-     state.formulaResult={value:window.LiveStatFormula(state.formula,base)};
+     state.formulaResult={value:calculateFormula(state.formula,base)};
    }catch(e){state.formulaResult={error:e.message||String(e)}}
    refresh();
  }
