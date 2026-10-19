@@ -6,7 +6,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  const state={sport:'nba',season:yearNow+1,compareSeason:yearNow,player:null,search:'',results:[],loading:false,searching:false,error:'',
    data:null,compare:null,archive:[],tab:'dashboard',metric:null,layoutName:'My Stat Dashboard',savedLayouts:[],activeLayout:null,
    metrics:[],cardMode:'latest',cardTheme:'redline',formula:'PTS + REB + AST',formulaResult:null,
-   report:null,reportLoading:false,comparisonLoading:false,currentGame:null,current:null,archiveCursor:0,archiveStorage:null,selectedMilestone:null};
+   report:null,careerReport:null,reportLoading:false,comparisonLoading:false,currentGame:null,current:null,archiveCursor:0,archiveStorage:null,selectedMilestone:null};
  try{if(typeof localStorage!=='undefined')state.savedLayouts=JSON.parse(localStorage.getItem('livestat-lab-layouts')||'[]')}catch{state.savedLayouts=[]}
  const motion=createAnimatedCardsStudio({
    refresh,notify:toast,
@@ -151,7 +151,9 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    return n==null?{avg:null,avgSource:null}:{avg:fmt(n),avgSource:'SAMPLE AVG'};
  }
  function highlightGallery(){
-   return [...(state.data?.milestones||[]),...(state.data?.missions||[])].slice(0,55);
+   const highlights=[...(state.current?.milestones||[]),...(state.current?.missions||[]),
+     ...(state.data?.milestones||[]),...(state.data?.missions||[])];
+   return [...new Map(highlights.map(x=>[x.id,x])).values()].slice(0,55);
  }
  function selectHighlight(id){
    const item=highlightGallery().find(x=>x.id===id);
@@ -214,13 +216,24 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
      ${res?`<div class="lab-formula-result ${res.error?'error':''}"><small>${res.error?'CHECK FORMULA':'LATEST RECORDED GAME'}</small><strong>${escape(res.error||res.value)}</strong></div>`:''}
      <p class="lab-muted">Available fields: ${escape(labels().join(', ')||'No stats returned')}. Formulas operate on the most recently recorded game and support +, −, ×, ÷, parentheses, and numerical constants.</p></section>`;
  }
+ async function runCareerReport(){
+   if(!state.player?.id||!state.metric)return;
+   state.reportLoading=true;refresh();
+   try{
+     const address='/api/analytics/career-report?sport='+encodeURIComponent(state.sport)+
+       '&athlete='+encodeURIComponent(state.player.id)+'&metric='+encodeURIComponent(state.metric);
+     state.careerReport=await api(address);
+   }catch(e){toast(e.message||String(e))}
+   finally{state.reportLoading=false;refresh()}
+ }
  function analystView(){
    const a=state.report?.analysis;
    return `<section class="lab-panel"><div class="lab-panel-title"><h3>GAME ANALYST</h3>${metricOptions()}</div>
     <p>Explain what the actual game logs say about a player's form. Statistical mode is free. Optional AI-generated wording requires a configured server-side OpenAI API key.</p>
-    <div class="lab-row-actions"><button data-action="lab-analyze" ${state.reportLoading?'disabled':''}>GENERATE DATA-GROUNDED REPORT</button><button data-action="lab-analyze-ai" ${state.reportLoading?'disabled':''}>TRY AI EXPLANATION</button></div>
+    <div class="lab-row-actions"><button data-action="lab-analyze" ${state.reportLoading?'disabled':''}>GENERATE DATA-GROUNDED REPORT</button><button data-action="lab-analyze-ai" ${state.reportLoading?'disabled':''}>TRY AI EXPLANATION</button><button data-action="lab-career-analyze" ${state.reportLoading?'disabled':''}>CAREER REPORT</button></div>
     ${state.reportLoading?'<div class="lab-empty">Evaluating the available recorded games…</div>':''}
     ${a?`<div class="lab-analysis"><small>${state.report.mode==='ai'?'AI EXPLANATION · EVIDENCE PROVIDED':'STATISTICAL ANALYSIS · NO LLM'}</small><p>${escape(a.summary)}</p><footer>${a.gameCount??0} available games in the selected season · Data: ESPN (unofficial)</footer></div>`:''}
+    ${state.careerReport?.analysis?`<div class="lab-analysis"><small>ARCHIVED CAREER REPORT</small><p>${escape(state.careerReport.analysis.summary)}</p><footer>${state.careerReport.seasonCount} saved season snapshots · ${escape(state.careerReport.mode)}</footer></div>`:''}
     ${state.report?.warning?`<p class="lab-warning">${escape(state.report.warning)}</p>`:''}
     <div class="lab-evidence">${series().slice(0,10).map(g=>`<span>${escape(g.opponent||g.date?.slice(0,10)||'Game')}: <strong>${escape(g.value)} ${escape(state.metric)}</strong></span>`).join('')}</div>
    </section>`;
@@ -266,7 +279,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  function openPlayer(player,sport,context=null){
    if(!player?.id)return;
    state.sport=sport||state.sport;state.player={...player};state.currentGame=context;state.current=null;state.cardMode=context?.gameId?'live':'latest';
-   state.data=null;state.compare=null;state.archive=[];state.archiveCursor=0;state.archiveStorage=null;state.selectedMilestone=null;state.activeLayout=null;state.metrics=[];state.metric=null;
+   state.data=null;state.compare=null;state.archive=[];state.archiveCursor=0;state.archiveStorage=null;state.selectedMilestone=null;state.careerReport=null;state.activeLayout=null;state.metrics=[];state.metric=null;
    state.tab='dashboard';state.results=[];state.search='';state.error='';
    state.season=['nba','ncaam','ncaaw'].includes(state.sport)?yearNow+(new Date().getUTCMonth()>=6?1:0):yearNow;
    state.compareSeason=state.season-1;refresh();return load();
@@ -329,7 +342,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    setTimeout(()=>URL.revokeObjectURL(url),10000);
  }
  async function png(){
-   if(!state.data||(!rows().length&&state.cardMode!=='live'))return toast('No recorded stats for a card');
+   if(!state.data||(!rows().length&&!['live','milestone'].includes(state.cardMode)))return toast('No recorded stats for a card');
    if(state.cardMode==='live'&&!state.current?.available)return toast('Selected-game box score not available yet');
    try{
      const {exportPlayerCard}=await import('./analytics-card.js');
@@ -372,6 +385,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    if(action==='lab-formula-run'){runFormula();return true}
    if(action==='lab-formula-insert'){state.formula=(state.formula.trim()?state.formula+' + ':'')+node.dataset.metric;refresh();return true}
    if(action==='lab-analyze'){report(false);return true}
+   if(action==='lab-career-analyze'){runCareerReport();return true}
    if(action==='lab-analyze-ai'){report(true);return true}
    if(action==='lab-csv'){csv();return true}
    return false;
