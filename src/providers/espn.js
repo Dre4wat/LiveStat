@@ -46,7 +46,8 @@ export function espnProviderFor(sport){
     const d=await getJson(sport,'/teams'+params);
     return (d.sports?.[0]?.leagues?.[0]?.teams||[]).map(x=>x.team||x)
       .filter(x=>x.id&&x.displayName).map(x=>({id:String(x.id),name:x.displayName,
-        abbreviation:x.abbreviation||'',logo:x.logos?.[0]?.href||null})).sort((a,b)=>a.name.localeCompare(b.name));
+        abbreviation:x.abbreviation||'',logo:x.logos?.[0]?.href||null,
+        color:x.color||'',alternateColor:x.alternateColor||''})).sort((a,b)=>a.name.localeCompare(b.name));
   },
   async roster(teamId,{gameId,season}={}){
     if(!/^[0-9]{1,8}$/.test(String(teamId)))throw new Error('Invalid team');
