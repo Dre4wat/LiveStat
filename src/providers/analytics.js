@@ -115,14 +115,14 @@ export function analyzePlayer(player,games,metric){
 }
 // Recursive-descent arithmetic parser. Never use eval or Function on user formulas.
 export function calculateFormula(expression, stats){
-  const tokens=text(expression).match(/[A-Za-z_][A-Za-z_0-9]*|\d+(?:\.\d+)?|[()+*/-]/g)||[];
+  const tokens=text(expression).match(/[A-Za-z_][A-Za-z_0-9%]*|[0-9]+[A-Za-z_][A-Za-z_0-9%]*|\d+(?:\.\d+)?|[()+*/-]/g)||[];
   if(!tokens.length || tokens.length>80 || tokens.join('').toUpperCase()!==text(expression).replace(/\s+/g,'').toUpperCase())throw Error('Invalid formula');
   let i=0; const fields=Object.fromEntries(Object.entries(stats||{}).map(([k,v])=>[key(k),numeric(v)]));
   const factor=()=>{
     const t=tokens[i++];if(!t)throw Error('Incomplete formula');
     if(t==='('){const v=expr();if(tokens[i++]!==')')throw Error('Missing closing parenthesis');return v;}
     if(t==='-')return -factor();
-    if(/^\d/.test(t))return Number(t);
+    if(/^\d+(?:\.\d+)?$/.test(t))return Number(t);
     const k=key(t);if(!Object.hasOwn(fields,k)||fields[k]===null)throw Error('Unavailable stat: '+t);
     return fields[k];
   };
