@@ -4,6 +4,7 @@ import {positionOptions,filterRoster} from './roster-select.js';
 import {FOOTBALL_PLAYER_STATS,footballStatsForPosition} from './football-stats.js';
 import {createInsights} from './intelligence-ui.js';
 import {boxscoreMarkup} from './boxscore.js';
+import {createRosterBrowser} from './roster-browser.js';
 const $ = (s,root=document)=>root.querySelector(s);
 /* UI init selector fixes: querySelectorAll for collections; keep startup regression test */
 const $$ = (s,root=document)=>[...root.querySelectorAll(s)];
@@ -23,6 +24,16 @@ const s={boxscoreGame:null,boxscoreData:null,boxscoreLoading:false,boxscoreError
 const app=$('#app');let toastTimer;
 const intelligence=createInsights({api,escape:esc,refresh:()=>{if(['insights','command','league'].includes(s.tab))render()},getWatches:()=>s.watchList,getAlerts:()=>s.alerts});
 const analytics=createAnalyticsLab({api,refresh:()=>{if(s.tab==='analytics')render()},toast,getWatches:()=>s.watchList,calculateFormula});
+const rosterBrowser=createRosterBrowser({
+ api,refresh:()=>{if(s.tab==='rosters')render()},toast,
+ onAnalytics:(player,sport,ctx)=>{
+   s.tab='analytics';
+   analytics.openPlayer({...player,team:ctx.team?.name||player.team,
+     teamAbbr:ctx.team?.abbreviation||'',teamColor:ctx.team?.color||''},sport);
+   render();
+ },
+ onTrack:sport=>selectSport(sport)
+});
 function toast(msg){const e=$('#toast');e.textContent=msg;e.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.classList.remove('show'),3700)}
 const isBB=()=>['nba','ncaam','ncaaw'].includes(s.sport);
 const configuredStats=()=>!isBB()&&s.kind==='player'?(s.showAllFootballStats?Object.keys(FOOTBALL_PLAYER_STATS):footballStatsForPosition(s.player?.position)):options[(isBB()?'bb':'fb')+(s.kind==='team'?'Team':'Player')];
@@ -138,8 +149,9 @@ function settingsView(){return `${ribbon()}${header('SYSTEM CONTROL','APP','SETT
 <div class="ls-discord-modes">${[['every','Every play'],['target','Milestones & missions'],['near','Almost there'],['correction','Stat corrections']].map(([key,value])=>`<label><input type="checkbox" data-discord-type="${key}" ${s.discord.types.includes(key)?'checked':''}/>${value}</label>`).join('')}</div>
 <button class="btn-secondary" data-action="discord-save">SAVE DISCORD SETTINGS</button><button class="btn-secondary" data-action="discord-test">TEST MESSAGE</button>
 <p class="ls-discord-warning">Optional and off by default. Saved webhooks are lost on free-host restarts. Do not share your webhook URL publicly.</p></div><div class="settings-card"><div class="eyebrow">YOUR VERSION</div><h3>LiveStat Arena v0.8</h3><p>Five leagues. Game-specific watch assignments. Select sport → game → player → stat loadout.</p></div></div>`}
-function render(){const pages={arena:()=>s.boxscoreGame?renderBoxScore():[sportView,gameView,selectTeamView,profileView][s.step](),watches:watchView,activity:feedView,settings:settingsView,insights:()=>intelligence.render(),command:()=>intelligence.render(),league:()=>intelligence.render(),analytics:()=>analytics.render()};app.innerHTML=pages[s.tab]();if(s.tab==='analytics')analytics.afterRender();$$('[data-tab]').forEach(e=>{const active=e.dataset.tab===s.tab;e.classList.toggle('active',active);e.classList.toggle('is-active',active)});$('#side-watch-count').textContent=s.watchList.length}
-function setTab(tab){s.tab=tab;render();if(tab==='command')intelligence.openCommand();if(tab==='league')intelligence.openLeague(s.sport||'nba');window.scrollTo({top:0,behavior:'instant'})}
+function render(){const pages={arena:()=>s.boxscoreGame?renderBoxScore():[sportView,gameView,selectTeamView,profileView][s.step](),watches:watchView,activity:feedView,settings:settingsView,insights:()=>intelligence.render(),command:()=>intelligence.render(),league:()=>intelligence.render(),analytics:()=>analytics.render(),rosters:()=>rosterBrowser.render()};app.innerHTML=pages[s.tab]();if(s.tab==='analytics')analytics.afterRender();$$('[data-tab]').forEach(e=>{const active=e.dataset.tab===s.tab;e.classList.toggle('active',active);e.classList.toggle('is-active',active)});$('#side-watch-count').textContent=s.watchList.length}
+function setTab(tab){s.tab=tab;render();if(tab==='command')intelligence.openCommand();if(tab==='league')intelligence.openLeague(s.sport||'nba');
+if(tab==='rosters')rosterBrowser.open(s.sport||null);window.scrollTo({top:0,behavior:'instant'})}
 async function gamesLoad(){s.error='';s.loading=true;render();try{const d=s.preview?{games:demoGames[s.sport]||[]}:await api(`/api/games?sport=${encodeURIComponent(s.sport)}&date=${dateCode()}`);s.games=d.games||[];}catch(e){s.error=e.message;s.games=[]}finally{s.loading=false;render()}}
 async function selectSport(id){s.boxscoreGame=null;s.boxscoreData=null;s.sport=id;s.game=null;s.team=null;s.player=null;s.rosterGroup=null;s.step=1;s.filter='all';s.gameDate=new Date();setTab('arena');await gamesLoad()}
 async function selectGame(id){s.game=s.games.find(g=>g.id===id);if(!s.game)return;s.step=2;s.team=s.game.teams?.[0]||null;s.search='';s.rosterGroup=null;s.roster=[];setTab('arena');await loadRoster()}
@@ -177,6 +189,7 @@ async function testPush(){if(s.preview)return toast('Demo only — notifications
 app.addEventListener('click',async e=>{const b=e.target.closest('button[data-action]');if(!b)return;const a=b.dataset.action;
 if(intelligence.handle(a,b))return;
 if(analytics.handle(a,b))return;
+if(rosterBrowser.handle(a,b))return;
 if(a==='labfromplayer'&&s.player){s.tab='analytics';analytics.openPlayer(s.player,s.sport,{gameId:s.game?.id,teamId:s.team?.id,team:s.team,game:s.game});render();return}
 if(a==='labfromwatch'){const w=s.watchList.find(w=>w.id===b.dataset.id);if(w?.playerId){s.tab='analytics';analytics.openPlayer({id:w.playerId,name:w.name,position:w.position},w.sport,{gameId:w.gameId,teamId:w.teamId});render()}return}
 if(a==='intelgame'){
@@ -201,7 +214,7 @@ if(a==='footballall'){s.showAllFootballStats=!s.showAllFootballStats;render();re
 if(a==='discord-save')return saveDiscord();if(a==='discord-test')return testDiscord();
 if(a==='intel-back'){s.tab='arena';render();return}
 if(a==='nav')return setTab(b.dataset.tab);if(a==='sport')return selectSport(b.dataset.sport);if(a==='filter'){s.filter=b.dataset.filter;return render()}if(a==='date'){s.gameDate.setDate(s.gameDate.getDate()+Number(b.dataset.days));return gamesLoad()}if(a==='game')return selectGame(b.dataset.game);if(a==='boxscore')return openBoxScore(b.dataset.game);if(a==='boxclose')return closeBoxScore();if(a==='boxrefresh')return refreshBoxScore();if(a==='boxtrack')return trackFromBoxScore();if(a==='boxteam'){s.boxscoreTeam=b.dataset.team;return render()}if(a==='team'){s.team=gameTeams().find(t=>t.id===b.dataset.team);s.search='';s.rosterGroup=null;return loadRoster()}if(a==='position'){s.rosterGroup=b.dataset.group;s.search='';return render()}if(a==='positions'){s.rosterGroup=null;s.search='';return render()}if(a==='player')return setPlayer(b.dataset.player);if(a==='trackteam')return trackTeam();if(a==='save')return save();if(a==='step'){const i=Number(b.dataset.step);if(i<=s.step){s.step=i;render()};return}if(a==='new'){s.sport=null;s.step=0;return setTab('arena')}if(a==='delete')return deleteWatch(b.dataset.id);if(a==='demoalert')return simulate(b.dataset.id);if(a==='sample'){if(s.preview)return sampleAlerts();try{await api('/api/sample','POST',{sport:'nba'});await loadStatus();render()}catch(err){toast(err.message)}return}if(a==='push')return push();if(a==='testpush')return testPush();if(a==='preview'){location.href='/?preview=1';return}});
-app.addEventListener('input',e=>{if(analytics.input(e.target))return;if(intelligence.input(e.target))return;if(e.target.matches('[data-smart]')){const k=e.target.dataset.smart,v=e.target.value;s.smart[k]=k==='combine'?v:k==='maxMargin'?(v===''?null:Number(v)):Number(v);return;}if(e.target.id==='player-search'){s.search=e.target.value;const results=$('#roster-results');if(results)results.innerHTML=rosterSection()}if(e.target.matches('[data-rule-every]')){const k=e.target.dataset.ruleEvery;s.rules[k]||={every:false,target:null};s.rules[k].every=e.target.checked}if(e.target.matches('[data-rule-target]')){const k=e.target.dataset.ruleTarget;s.rules[k]||={every:false,target:null};const v=e.target.value.trim();s.rules[k].target=v?Math.max(1,Math.floor(Number(v))):null}});
+app.addEventListener('input',e=>{if(analytics.input(e.target))return;if(rosterBrowser.input(e.target))return;if(intelligence.input(e.target))return;if(e.target.matches('[data-smart]')){const k=e.target.dataset.smart,v=e.target.value;s.smart[k]=k==='combine'?v:k==='maxMargin'?(v===''?null:Number(v)):Number(v);return;}if(e.target.id==='player-search'){s.search=e.target.value;const results=$('#roster-results');if(results)results.innerHTML=rosterSection()}if(e.target.matches('[data-rule-every]')){const k=e.target.dataset.ruleEvery;s.rules[k]||={every:false,target:null};s.rules[k].every=e.target.checked}if(e.target.matches('[data-rule-target]')){const k=e.target.dataset.ruleTarget;s.rules[k]||={every:false,target:null};const v=e.target.value.trim();s.rules[k].target=v?Math.max(1,Math.floor(Number(v))):null}});
 app.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target?.id==='lab-search'){e.preventDefault();analytics.handle('lab-search',{dataset:{}})}});
 $$('.mobile-nav,.side').forEach(n=>n.addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)setTab(b.dataset.tab)}));
 async function boot(){
