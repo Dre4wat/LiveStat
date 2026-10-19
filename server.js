@@ -48,6 +48,7 @@ const teamCache=new Map(),rosterCache=new Map();
 const boxScoreCache=new Map(); // Refresh live box scores frequently without flooding ESPN.
 const insightCache=new Map();
 const analystCooldown=new Map();
+let aiBudgetDay='',aiUsesToday=0;
 function validateAthleteSeason(url){
   const athlete=url.searchParams.get('athlete')||'';
   const season=Number(url.searchParams.get('season')||'0');
@@ -67,7 +68,7 @@ async function headshotImage(res,raw){
   if(Number(remote.headers.get('content-length')||0)>2500000)throw Error('Image too large');
   const buffer=Buffer.from(await remote.arrayBuffer());
   if(buffer.length>2500000)throw Error('Image too large');
-  res.writeHead(200,{'Content-Type':type,'Cache-Control':'public,max-age=86400','X-Content-Type-Options':'nosniff','Access-Control-Allow-Origin':'same-origin'});
+  res.writeHead(200,{'Content-Type':type,'Cache-Control':'public,max-age=86400','X-Content-Type-Options':'nosniff'});
   res.end(buffer);
 }
 
@@ -288,6 +289,10 @@ async function handle(req,res){
       const now=Date.now(),last=analystCooldown.get(ownerId)||0;
       if(now-last<300000)throw Error('AI analysis can be requested once every five minutes.');
       if(!evidence.sentences.length)return send(res,200,{analysis:evidence,mode:'statistical'});
+      const utcDay=new Date().toISOString().slice(0,10);
+      if(aiBudgetDay!==utcDay){aiBudgetDay=utcDay;aiUsesToday=0;}
+      if(aiUsesToday>=25)throw Error('Daily AI limit reached; the free statistical analyst remains available.');
+      aiUsesToday++;
       analystCooldown.set(ownerId,now);
       if(analystCooldown.size>1500)analystCooldown.clear();
       const model=process.env.LIVESTAT_AI_MODEL||'gpt-4.1-mini';
