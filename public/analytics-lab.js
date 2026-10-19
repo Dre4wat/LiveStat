@@ -11,7 +11,13 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  const motion=createAnimatedCardsStudio({
    refresh,notify:toast,
    getData:()=>{
-     const player={...state.player,...(state.data?.player||{})};
+     // Do not let blank profile fields erase the real identity selected in Arena.
+     const fromFeed=Object.fromEntries(Object.entries(state.data?.player||{})
+       .filter(([,value])=>value!=null&&String(value).trim()!==''));
+     const player={...(state.player||{}),...fromFeed};
+     if(!player.team&&state.currentGame?.team?.name)player.team=state.currentGame.team.name;
+     if(!player.teamAbbr&&state.currentGame?.team?.abbr)player.teamAbbr=state.currentGame.team.abbr;
+     if(!player.teamColor&&state.currentGame?.team?.color)player.teamColor=state.currentGame.team.color;
      const matching=getWatches().find(w=>w.kind==='player'&&String(w.playerId)===String(player.id)&&w.sport===state.sport&&
         (!state.currentGame?.gameId||String(w.gameId)===String(state.currentGame.gameId)));
      return {
@@ -66,7 +72,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
      <small>${state.data?.history?.count??0} recorded game${state.data?.history?.count===1?'':'s'} available</small></div>`;
  }
  function profileTop(){
-   const p=state.data?.player||state.player||{};
+   const p={...(state.player||{}),...Object.fromEntries(Object.entries(state.data?.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))};
    const logo=String(p.headshot||'');
    return `<div class="lab-profile"><div class="lab-avatar">${/^https:\/\//.test(logo)?`<img src="/api/analytics/headshot?url=${encodeURIComponent(logo)}" alt="" onerror="this.style.display='none'" />`:escape((p.name||'LS').split(' ').slice(0,2).map(x=>x[0]).join(''))}</div>
    <div><small>${escape(sports[state.sport])} / SEASON ${state.season}</small><h2>${escape(p.name||'PLAYER')}</h2><p>${escape(p.team||'Team unavailable')} · ${escape(p.position||'Position unavailable')}</p></div>
@@ -187,7 +193,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    return selected.map(k=>({label:k,value:state.cardMode==='average'?fmt(mean(list,k)):best?.stats?.[k]??null,...cardAverage(k)}));
  }
  function cardView(){
-   const player=state.data?.player||state.player||{};
+   const player={...(state.player||{}),...Object.fromEntries(Object.entries(state.data?.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))};
    const cardStats=cardMetrics();
    return `<section class="lab-panel"><div class="lab-panel-title"><h3>PLAYER CARD STUDIO</h3><button class="lab-motion-link" data-action="lab-tab" data-value="animated">▶ ANIMATE THIS CARD ↗</button></div>
    <div class="lab-row-actions"><label>STYLE<select id="lab-theme">${['redline','silver','midnight'].map(x=>`<option value="${x}" ${state.cardTheme===x?'selected':''}>${x.toUpperCase()}</option>`).join('')}</select></label>
@@ -253,7 +259,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    try{
      const x=await api('/api/analytics/player?sport='+encodeURIComponent(state.sport)+'&athlete='+encodeURIComponent(state.player.id)+'&season='+year);
      if(identity!==state.sport+':'+state.player?.id||year!==state.season)return;
-     state.selectedMilestone=null;if(state.cardMode==='milestone')state.cardMode='latest';state.data=x.analytics;state.player={...state.player,...Object.fromEntries(Object.entries(x.analytics.player||{}).filter(([,v])=>v!=null&&v!==''))};
+     state.selectedMilestone=null;if(state.cardMode==='milestone')state.cardMode='latest';state.data=x.analytics;state.player={...state.player,...Object.fromEntries(Object.entries(x.analytics.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))};
      ensureMetrics();state.report=null;state.formulaResult=null;
      try{const saved=await api('/api/analytics/archive?sport='+state.sport+'&athlete='+state.player.id);state.archiveStorage=saved;}catch{state.archiveStorage=null}
      if(state.currentGame?.gameId&&state.currentGame?.teamId){
@@ -268,7 +274,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
  async function search(){
    const term=state.search.trim();
    if(!term){state.results=[];refresh();return}
-   if(/^\d{1,14}$/.test(term)){openPlayer({id:term,name:'ESPN Player '+term},state.sport);return}
+   if(/^\d{1,14}$/.test(term)){openPlayer({id:term,name:''},state.sport);return}
    if(term.length<2)return toast('Enter at least 2 characters');
    state.searching=true;state.results=[];state.error='';refresh();
    try{const d=await api('/api/analytics/search?sport='+state.sport+'&q='+encodeURIComponent(term));state.results=d.players||[];
@@ -346,7 +352,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    if(state.cardMode==='live'&&!state.current?.available)return toast('Selected-game box score not available yet');
    try{
      const {exportPlayerCard}=await import('./analytics-card.js');
-     const player={...state.player,...state.data.player};
+     const player={...(state.player||{}),...Object.fromEntries(Object.entries(state.data?.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))};
      const metrics=cardMetrics();
      await exportPlayerCard({player,sport:state.sport,season:state.season,theme:state.cardTheme,metrics,
        title:state.cardMode==='milestone'?(state.selectedMilestone?.name||'VERIFIED MILESTONE'):state.cardMode==='live'?'SELECTED GAME BOX SCORE':state.cardMode==='average'?'GAME LOG AVERAGE':state.cardMode==='best'?'SEASON BEST':'LATEST RECORDED GAME',
