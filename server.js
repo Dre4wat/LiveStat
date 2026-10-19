@@ -249,6 +249,20 @@ async function handle(req,res){
       const list=await cached('athletes:'+sport+':'+q.toLowerCase(),180000,()=>provider.searchAthletes(q));
       return send(res,200,{players:list});
     }
+    if(req.method==='GET'&&route==='/api/analytics/current'){
+      const {sport,provider}=providerFrom(url),game=safeGame(url);
+      const athlete=url.searchParams.get('athlete')||'',team=url.searchParams.get('team')||'';
+      if(!/^[0-9]{1,14}$/.test(athlete)||!/^[0-9]{1,8}$/.test(team))throw Error('Invalid team or athlete');
+      const box=await cached('current:'+sport+':'+game,18000,()=>provider.boxScore(game));
+      const group=(box.groups||[]).find(x=>String(x.teamId)===team);
+      const sections=(group?.sections||[]).flatMap(section=>{
+        const row=(section.rows||[]).find(x=>String(x.id)===athlete);
+        return row?[{name:section.name,labels:section.labels,values:row.stats}]:[];
+      });
+      const stats=extractBoxTotals(box,{sport,kind:'player',teamId:team,playerId:athlete});
+      return send(res,200,{current:{sport,gameId:game,athlete,team,state:box.state,status:box.status,
+        stats,sections,available:sections.length>0&&Object.keys(stats).length>0,source:'ESPN box score'}});
+    }
     if(req.method==='GET'&&route==='/api/analytics/headshot'){
       return headshotImage(res,url.searchParams.get('url')||'');
     }
