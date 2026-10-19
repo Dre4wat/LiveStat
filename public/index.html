@@ -10,6 +10,7 @@
   <title>LiveStat // Arena</title>
   <link rel="manifest" href="/manifest.json" /><link rel="apple-touch-icon" href="/icon-192.png" />
   <link rel="stylesheet" href="/styles.css" /><link rel="stylesheet" href="/cinematic.css" /><link rel="stylesheet" href="/boxscore.css" /><link rel="stylesheet" href="/intelligence.css" /><link rel="stylesheet" href="/analytics-lab.css" />
+<link rel="stylesheet" href="/roster-browser.css" />
 </head>
 <body>
   <div class="shell">
@@ -17,6 +18,7 @@
       <button class="logo side-logo" data-action="nav" data-tab="arena" aria-label="LiveStat home"><span class="logo-glyph">LS</span><span class="logo-type">Live<span>Stat</span><small>REAL GAMES. REAL MOMENTS.</small></span></button>
       <div class="side-menu-label">COMMAND CENTER</div>
       <button class="side-item is-active" data-action="nav" data-tab="arena"><span class="side-icon">⌂</span> Game Center <span class="side-arrow">↗</span></button>
+      <button class="side-item" data-action="nav" data-tab="rosters"><span class="side-icon">▦</span> Team Rosters <span class="side-arrow">↗</span></button>
       <button class="side-item" data-action="nav" data-tab="watches"><span class="side-icon">◎</span> My Alerts <span class="side-badge" id="side-watch-count">0</span></button>
       <button class="side-item" data-action="nav" data-tab="activity"><span class="side-icon">▥</span> Live Activity</button>
       <button class="side-item" data-action="nav" data-tab="command"><span class="side-icon">▣</span> Command Center</button>
@@ -39,6 +41,7 @@
   </div>
   <nav class="mobile-nav" aria-label="Main navigation">
     <button class="mobile-nav-item active" data-action="nav" data-tab="arena"><span>◈</span><small>Home</small></button>
+    <button class="mobile-nav-item" data-action="nav" data-tab="rosters"><span>▦</span><small>Rosters</small></button>
     <button class="mobile-nav-item" data-action="nav" data-tab="watches"><span>◎</span><small>Alerts</small></button>
     <button class="mobile-nav-item" data-action="nav" data-tab="activity"><span>▥</span><small>Activity</small></button>
     <button class="mobile-nav-item" data-action="nav" data-tab="command"><span>▣</span><small>Command</small></button>
@@ -46,6 +49,6 @@
     <button class="mobile-nav-item" data-action="nav" data-tab="settings"><span>⚙</span><small>Settings</small></button>
   </nav>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="/app.js?v=20261019-real-player-cards"></script>
+  <script type="module" src="/app.js?v=20261019-roster-explorer"></script>
 </body>
 </html>
