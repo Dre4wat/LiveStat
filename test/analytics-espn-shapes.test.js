@@ -64,3 +64,17 @@ test('Player Cards prefer identifiable ESPN basketball season averages over inco
   assert.match(markup,/ESPN SEASON AVG 27\.2/);
   assert.doesNotMatch(markup,/SAMPLE AVG 40/);
 });
+
+test('Analytics Lab ESPN search respects the selected sport',async()=>{
+  const {espnProviderFor}=await import('../src/providers/espn.js');
+  const original=globalThis.fetch,requests=[];
+  globalThis.fetch=async url=>{
+    requests.push(String(url));
+    return {ok:true,json:async()=>({results:[{contents:[{id:'1966',type:'athlete',displayName:'LeBron James'}]}]})};
+  };
+  try{
+    const matches=await espnProviderFor('nba').searchAthletes('LeBron');
+    assert.equal(matches[0]?.id,'1966');
+    assert.match(requests[0],/sport=nba/);
+  }finally{globalThis.fetch=original}
+});
