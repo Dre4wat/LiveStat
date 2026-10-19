@@ -13,7 +13,7 @@ test('durable archive local directory stores historical seasons and serves them 
  const old=process.env.LIVESTAT_DATA_DIR,db=process.env.DATABASE_URL,folder=await fs.mkdtemp(path.join(os.tmpdir(),'livestat-archive-'));
  process.env.LIVESTAT_DATA_DIR=folder;delete process.env.DATABASE_URL;
  try{
-  const payload={season:2022,history:{games:[{id:'abc',stats:{PTS:40},date:'2022-04-01'}]},seasonStats:{categories:[]},player:{id:'1966'}};
+  const payload={season:2022,history:{games:[{id:'abc',stats:{PTS:40},date:'2022-04-01'}]},seasonStats:{categories:[]},player:{id:'1966',name:'LeBron James'}};
   const live=await fetchOrArchivePlayer('nba','1966',2022,async()=>payload);
   assert.equal(live.archive.source,'live');
   const result=await fetchOrArchivePlayer('nba','1966',2022,async()=>{throw Error('Should not request old season')});
