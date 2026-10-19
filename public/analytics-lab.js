@@ -8,13 +8,24 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    metrics:[],cardMode:'latest',cardTheme:'redline',formula:'PTS + REB + AST',formulaResult:null,
    report:null,careerReport:null,reportLoading:false,comparisonLoading:false,currentGame:null,current:null,archiveCursor:0,archiveStorage:null,selectedMilestone:null};
  try{if(typeof localStorage!=='undefined')state.savedLayouts=JSON.parse(localStorage.getItem('livestat-lab-layouts')||'[]')}catch{state.savedLayouts=[]}
+
+ // Historical snapshots from older releases can lack a photo field even if
+ // the athlete ID is known. ESPN CDN URLs are best-effort candidates; failed
+ // images are explicitly marked unavailable in Motion Studio.
+ const withHeadshot=player=>{
+   const p={...(player||{})},id=String(p.id||'');
+   const folders={nfl:'nfl',cfb:'college-football',nba:'nba',ncaam:'mens-college-basketball',ncaaw:'womens-college-basketball'};
+   if(!p.headshot&&/^[0-9]{1,14}$/.test(id)&&folders[state.sport])
+     p.headshot='https://a.espncdn.com/i/headshots/'+folders[state.sport]+'/players/full/'+id+'.png';
+   return p;
+ };
  const motion=createAnimatedCardsStudio({
    refresh,notify:toast,
    getData:()=>{
      // Do not let blank profile fields erase the real identity selected in Arena.
      const fromFeed=Object.fromEntries(Object.entries(state.data?.player||{})
        .filter(([,value])=>value!=null&&String(value).trim()!==''));
-     const player={...(state.player||{}),...fromFeed};
+     const player=withHeadshot({...(state.player||{}),...fromFeed});
      if(!player.team&&state.currentGame?.team?.name)player.team=state.currentGame.team.name;
      if(!player.teamAbbr&&state.currentGame?.team?.abbr)player.teamAbbr=state.currentGame.team.abbr;
      if(!player.teamColor&&state.currentGame?.team?.color)player.teamColor=state.currentGame.team.color;
@@ -72,7 +83,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
      <small>${state.data?.history?.count??0} recorded game${state.data?.history?.count===1?'':'s'} available</small></div>`;
  }
  function profileTop(){
-   const p={...(state.player||{}),...Object.fromEntries(Object.entries(state.data?.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))};
+   const p=withHeadshot({...(state.player||{}),...Object.fromEntries(Object.entries(state.data?.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))});
    const logo=String(p.headshot||'');
    return `<div class="lab-profile"><div class="lab-avatar">${/^https:\/\//.test(logo)?`<img src="/api/analytics/headshot?url=${encodeURIComponent(logo)}" alt="" onerror="this.style.display='none'" />`:escape((p.name||'LS').split(' ').slice(0,2).map(x=>x[0]).join(''))}</div>
    <div><small>${escape(sports[state.sport])} / SEASON ${state.season}</small><h2>${escape(p.name||'PLAYER')}</h2><p>${escape(p.team||'Team unavailable')} · ${escape(p.position||'Position unavailable')}</p></div>
@@ -193,7 +204,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    return selected.map(k=>({label:k,value:state.cardMode==='average'?fmt(mean(list,k)):best?.stats?.[k]??null,...cardAverage(k)}));
  }
  function cardView(){
-   const player={...(state.player||{}),...Object.fromEntries(Object.entries(state.data?.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))};
+   const player=withHeadshot({...(state.player||{}),...Object.fromEntries(Object.entries(state.data?.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))});
    const cardStats=cardMetrics();
    return `<section class="lab-panel"><div class="lab-panel-title"><h3>PLAYER CARD STUDIO</h3><button class="lab-motion-link" data-action="lab-tab" data-value="animated">▶ ANIMATE THIS CARD ↗</button></div>
    <div class="lab-row-actions"><label>STYLE<select id="lab-theme">${['redline','silver','midnight'].map(x=>`<option value="${x}" ${state.cardTheme===x?'selected':''}>${x.toUpperCase()}</option>`).join('')}</select></label>
@@ -352,7 +363,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    if(state.cardMode==='live'&&!state.current?.available)return toast('Selected-game box score not available yet');
    try{
      const {exportPlayerCard}=await import('./analytics-card.js');
-     const player={...(state.player||{}),...Object.fromEntries(Object.entries(state.data?.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))};
+     const player=withHeadshot({...(state.player||{}),...Object.fromEntries(Object.entries(state.data?.player||{}).filter(([,v])=>v!=null&&String(v).trim()!==''))});
      const metrics=cardMetrics();
      await exportPlayerCard({player,sport:state.sport,season:state.season,theme:state.cardTheme,metrics,
        title:state.cardMode==='milestone'?(state.selectedMilestone?.name||'VERIFIED MILESTONE'):state.cardMode==='live'?'SELECTED GAME BOX SCORE':state.cardMode==='average'?'GAME LOG AVERAGE':state.cardMode==='best'?'SEASON BEST':'LATEST RECORDED GAME',
