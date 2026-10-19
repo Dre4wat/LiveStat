@@ -137,3 +137,36 @@
   .mobile-nav-item span{font-size:21px!important;line-height:26px!important}
   .mobile-nav-item small{font-size:8px!important;letter-spacing:0!important}
 }
+
+
+/* Animated Cards Studio – responsive social-video canvas export */
+.animated-creator{background:linear-gradient(145deg,#171015,#0a0b0e);border:1px solid #743748;border-radius:16px;padding:18px;margin:15px 0}
+.animated-intro{padding:8px 6px 20px;border-bottom:1px solid #613440}
+.animated-intro>span{font-size:10px;letter-spacing:2px;color:#ddd0d6;font-weight:900}
+.animated-intro>span span{color:#f64b62}
+.animated-intro h3{font:italic 900 clamp(26px,5vw,49px)/1 Impact,"Arial Narrow",sans-serif;color:#fff;letter-spacing:1px;margin:12px 0 7px}
+.animated-intro p{font-size:12px;color:#c5b6bd;margin:0;line-height:1.6}
+.animated-control-layout{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:18px;margin-top:20px}
+.animated-controls{min-width:0}
+.animated-control{margin:0 0 21px}
+.animated-control>strong{display:block;color:#e8abb9;font-size:11px;letter-spacing:1.3px;margin:0 0 11px}
+.animated-control>small,.animated-control>p{display:block;color:#a8939d;font-size:11px;line-height:1.6;margin:10px 0 0}
+.animated-control>label{display:block;color:#d9a6b0;font-size:10px;font-weight:900;margin:10px 0 7px}
+.animated-control select,.animated-control input{display:block;width:100%;background:#22171e;border:1px solid #683744;color:#fff;border-radius:9px;padding:12px;font-size:12px}
+.animated-switches{display:flex;flex-wrap:wrap;gap:7px}
+.animated-switches button{background:#24171c;border:1px solid #673c46;border-radius:8px;padding:10px 11px;color:#f0d9e1;font-size:10px;font-weight:850;letter-spacing:.2px}
+.animated-switches button.selected{background:#c52b40;border-color:#fd6073;color:#fff}
+.animated-switches button:hover{border-color:#fc657a}
+.animated-goal{display:flex;justify-content:space-between;padding:9px;border-bottom:1px solid #50303c;gap:10px;font-size:11px}
+.animated-goal b{color:#fff}
+.animated-missing{border:1px dashed #8c4654;padding:15px;border-radius:8px;color:#dbc2c9;font-size:11px}
+.animated-export{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:22px 0 8px}
+.animated-export button{padding:12px 10px;border:1px solid #ad3f50;background:#40202d;color:white;font-size:11px;font-weight:900;border-radius:9px}
+.animated-export button:last-child{grid-column:1/-1;background:linear-gradient(115deg,#a61c33,#ed4258);border-color:#f65e73}
+.animated-export button:disabled{opacity:.5;cursor:default}
+.animated-note{font-size:10px;color:#9f8a97;line-height:1.6}
+.animated-preview{border:1px solid #6f3646;border-radius:13px;background:radial-gradient(circle at 50% 0,#601b2980,#130d12 75%);padding:13px;min-width:0;display:flex;flex-direction:column;align-items:center}
+.animated-preview-header{align-self:stretch;display:flex;justify-content:space-between;gap:8px;font-size:9px;color:#eec6cc;letter-spacing:.7px;font-weight:850;padding-bottom:15px}
+.animated-preview canvas{display:block;height:auto;max-height:680px;width:auto;max-width:100%;object-fit:contain;background:#07090d;border:1px solid #aa4255;border-radius:7px;box-shadow:0 18px 35px #000a}
+.animated-preview-caption{font-size:10px;color:#bfaab4;text-align:center;margin:14px 0 2px;line-height:1.5}
+@media(max-width:760px){.animated-control-layout{grid-template-columns:1fr}.animated-preview{order:-1}.animated-preview canvas{max-height:520px}.animated-creator{padding:13px}.animated-preview-header{flex-wrap:wrap}}
