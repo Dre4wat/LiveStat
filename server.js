@@ -365,7 +365,7 @@ async function handle(req,res){
   let st;try{st=fs.statSync(file)}catch{return send(res,404,{error:'Not found'})}
   if(!st.isFile())return send(res,404,{error:'Not found'});
   res.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream',
-    'Cache-Control':file.endsWith('sw.js')?'no-cache':'public, max-age=300',
+    'Cache-Control':(/\.(?:html|js)$/.test(file)?'no-cache':'public, max-age=300'),
     'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY'});
   if(req.method==='HEAD')return res.end();fs.createReadStream(file).pipe(res);
 }
