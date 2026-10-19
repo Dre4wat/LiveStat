@@ -5,6 +5,7 @@ import {normalizeIntelligence} from './intelligence.js';
 import {enrichRoster} from './roster-ranking.js';
 import {normalizeGameLog,normalizeSeasonStats,normalizeESPNPlayerSearch} from './analytics.js';
 import {normalizeAthleteIdentity} from './athlete-identity.js';
+import {rosterSeasonSummary} from './roster-browser.js';
 export const SPORTS = {
   nfl:   {label:'NFL', path:'football/nfl', ball:'football'},
   cfb:   {label:'College Football', path:'football/college-football', ball:'football'},
@@ -47,23 +48,39 @@ export function espnProviderFor(sport){
       .filter(x=>x.id&&x.displayName).map(x=>({id:String(x.id),name:x.displayName,
         abbreviation:x.abbreviation||'',logo:x.logos?.[0]?.href||null})).sort((a,b)=>a.name.localeCompare(b.name));
   },
-  async roster(teamId,{gameId}={}){
+  async roster(teamId,{gameId,season}={}){
     if(!/^[0-9]{1,8}$/.test(String(teamId)))throw new Error('Invalid team');
     if(gameId&&!/^[0-9]{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
+    if(season!=null&&(!Number.isInteger(Number(season))||Number(season)<1980||Number(season)>new Date().getUTCFullYear()+2))throw Error('Invalid roster season');
+    const suffix=season!=null?'?season='+season:'';
     // Roster is essential; all ranking sources are optional. Missing depth chart
     // or leaders must never prevent someone from selecting a player.
     const [rosterData,depthResult,leaderResult,gameResult]=await Promise.all([
-      getJson(sport,`/teams/${teamId}/roster`),
-      getJson(sport,`/teams/${teamId}/depthcharts`).catch(()=>null),
-      getJson(sport,`/teams/${teamId}/leaders`).catch(()=>null),
+      getJson(sport,`/teams/${teamId}/roster${suffix}`),
+      getJson(sport,`/teams/${teamId}/depthcharts${suffix}`).catch(()=>null),
+      getJson(sport,`/teams/${teamId}/leaders${suffix}`).catch(()=>null),
       gameId?getJson(sport,`/summary?event=${gameId}`).then(raw=>normalizeBoxScore(sport,gameId,raw)).catch(()=>null):Promise.resolve(null)
     ]);
     const players=flattenRoster(rosterData.athletes||[]).filter(p=>p.id&&p.displayName).map(p=>({
       id:String(p.id),name:p.displayName,shortName:p.shortName||p.displayName,
       position:p.position?.abbreviation||p.position?.displayName||'',
-      jersey:p.jersey||'',headshot:p.headshot?.href||null,teamId:String(teamId)
+      jersey:p.jersey||'',headshot:p.headshot?.href||null,teamId:String(teamId),
+      age:Number.isFinite(Number(p.age))&&p.age!=null?Number(p.age):null,
+      height:p.displayHeight||p.height||'',weight:p.displayWeight||p.weight||'',
+      experience:p.experience?.displayValue??p.experience?.years??null,
+      college:p.college?.name||p.college?.displayName|| (typeof p.college==='string'?p.college:'')||'',
+      birthPlace:p.birthPlace?.city||'',status:p.status?.name||p.status?.type||''
     }));
     return enrichRoster(players,sport,{depthCharts:depthResult,leaders:leaderResult,boxScore:gameResult})
+  },
+  async rosterStats(athleteId,season){
+    if(!/^[0-9]{1,14}$/.test(String(athleteId)))throw Error('Invalid athlete');
+    if(!Number.isInteger(Number(season))||Number(season)<1980||Number(season)>new Date().getUTCFullYear()+2)throw Error('Invalid season');
+    const endpoint='https://site.web.api.espn.com/apis/common/v3/sports/'+SPORTS[sport].path+
+      '/athletes/'+athleteId+'/gamelog?season='+season;
+    const raw=await getPublic(endpoint);
+    const rows=normalizeGameLog(raw,season);
+    return rosterSeasonSummary(sport,rows.games);
   },
   async games({date}={}){
     const params=sport==='cfb'?'?groups=90&limit=400':(sport==='ncaam'||sport==='ncaaw')?'?groups=50&limit=500':'';
