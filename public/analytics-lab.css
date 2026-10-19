@@ -130,3 +130,10 @@
  .lab-card-preview{padding:16px}
  .lab-season-pair{gap:7px}
 }
+
+@media(max-width:900px){
+  .mobile-nav{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+  .mobile-nav-item{min-width:0}
+  .mobile-nav-item span{font-size:21px!important;line-height:26px!important}
+  .mobile-nav-item small{font-size:8px!important;letter-spacing:0!important}
+}
