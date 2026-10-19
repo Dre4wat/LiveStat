@@ -4,6 +4,7 @@ import {normalizeBoxScore} from './boxscore.js';
 import {normalizeIntelligence} from './intelligence.js';
 import {enrichRoster} from './roster-ranking.js';
 import {normalizeGameLog,normalizeSeasonStats,normalizeESPNPlayerSearch} from './analytics.js';
+import {normalizeAthleteIdentity} from './athlete-identity.js';
 export const SPORTS = {
   nfl:   {label:'NFL', path:'football/nfl', ball:'football'},
   cfb:   {label:'College Football', path:'football/college-football', ball:'football'},
@@ -93,28 +94,29 @@ export function espnProviderFor(sport){
     if(!/^[0-9]{1,14}$/.test(String(athleteId)))throw Error('Invalid athlete ID');
     if(!Number.isInteger(Number(season))||Number(season)<1980||Number(season)>new Date().getUTCFullYear()+2)throw Error('Invalid season');
     const prefix='https://site.web.api.espn.com/apis/common/v3/sports/'+SPORTS[sport].path+'/athletes/'+athleteId+'/';
-    const [log,stats,overview]=await Promise.allSettled([
+    const [log,stats,overview,identity]=await Promise.allSettled([
       getPublic(prefix+'gamelog?season='+season),
       getPublic(prefix+'stats?season='+season),
-      getPublic(prefix+'overview')
+      getPublic(prefix+'overview'),
+      // Athlete ROOT is the identity endpoint. /overview usually contains
+      // statistics, not guaranteed player name, team or headshot.
+      getPublic(prefix.slice(0,-1))
     ]);
     const history=normalizeGameLog(log.status==='fulfilled'?log.value:null,season);
-    const seasonStats=normalizeSeasonStats(stats.status==='fulfilled'?stats.value:null,season);
-    const profile=overview.status==='fulfilled'?overview.value:{};
-    const athlete=profile.athlete||profile.player||{};
-    const team=athlete.team||profile.team||{};
-    const headshot=athlete.headshot?.href||athlete.headshot||profile.headshot?.href||'';
+    const statsData=stats.status==='fulfilled'?stats.value:{};
+    const overviewData=overview.status==='fulfilled'?overview.value:{};
+    const identityData=identity.status==='fulfilled'?identity.value:{};
+    const seasonStats=normalizeSeasonStats(statsData,season);
+    const player=normalizeAthleteIdentity({
+      root:identityData,overview:overviewData,stats:statsData,sport,id:athleteId
+    });
     return {
-      sport,athleteId:String(athleteId),season:Number(season),
-      player:{id:String(athleteId),name:athlete.displayName||athlete.fullName||'',
-        position:athlete.position?.abbreviation||athlete.position?.displayName||'',
-        headshot:String(headshot||''),team:String(team.displayName||team.name||''),
-        teamAbbr:String(team.abbreviation||''),teamColor:String(team.color||''),
-        alternateColor:String(team.alternateColor||'')},
+      sport,athleteId:String(athleteId),season:Number(season),player,
       history,seasonStats,
       unavailable:log.status==='rejected'&&stats.status==='rejected',
       feedWarnings:[...(log.status==='rejected'?['Game log unavailable']:[]),
-        ...(stats.status==='rejected'?['Season aggregates unavailable']:[])]
+        ...(stats.status==='rejected'?['Season aggregates unavailable']:[]),
+        ...(identity.status==='rejected'?['Player identity feed unavailable; using available roster or ESPN photo fallback']:[])]
     };
   },
   async searchAthletes(query){
