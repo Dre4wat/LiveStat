@@ -17,7 +17,7 @@ function rounded(ctx,x,y,w,h,r,color){
 }
 export function createAnimatedCardsStudio({getData,refresh,notify=()=>{}}){
   const state={template:'performance',format:'vertical',mode:'auto',palette:'redline',duration:5,playing:false,exporting:false,
-    metric:null,goal:null,error:'',image:null,imageUrl:'',supported:null};
+    metric:null,goal:null,error:'',image:null,imageUrl:'',imageStatus:'unavailable',imagePromise:null,supported:null};
   const formats={square:[1080,1080],portrait:[1080,1350],vertical:[1080,1920]};
   const scenes={performance:'PERFORMANCE RECAP',target:'TARGET REACHED',mission:'MISSION COMPLETE'};
   const choices=[['square','DISCORD · 1:1'],['portrait','SOCIAL · 4:5'],['vertical','TIKTOK · 9:16']];
@@ -84,7 +84,8 @@ export function createAnimatedCardsStudio({getData,refresh,notify=()=>{}}){
       '<p class="animated-note">A supported browser can export MP4 or WebM. iPhone support varies; PNG always remains available. Videos do not include copyrighted broadcast footage.</p>'+
       '</div><div class="animated-preview"><div class="animated-preview-header"><span>REAL-TIME RENDER PREVIEW</span><span>'+formats[state.format].join(' × ')+' · '+state.duration+' SECONDS</span></div>'+
       '<canvas id="animated-preview-canvas" width="'+formats[state.format][0]+'" height="'+formats[state.format][1]+'" aria-label="Animated stat card preview"></canvas>'+
-      '<p class="animated-preview-caption">Source: ESPN unofficial · '+escapeHTML(data().player?.name||'No player chosen')+' · '+escapeHTML(data().season||'')+'</p></div></div></div>';
+      '<p class="animated-preview-caption">Source: ESPN unofficial · '+escapeHTML(data().player?.name||'Player profile unavailable')+' · '+escapeHTML(data().season||'')+'</p>'+
+       '<p id="animated-photo-status" class="animated-preview-caption">PHOTO: '+escapeHTML(state.imageStatus==='ready'?'ESPN headshot loaded':state.imageStatus==='loading'?'Loading ESPN headshot…':state.imageStatus==='failed'?'Headshot unavailable at ESPN':'Not provided by ESPN')+'</p></div></div></div>';
   }
   function draw(t=1){
     const canvas=document.getElementById('animated-preview-canvas');if(!canvas)return;
@@ -100,7 +101,7 @@ export function createAnimatedCardsStudio({getData,refresh,notify=()=>{}}){
     ctx.globalAlpha=.17;
     for(let i=0;i<12;i++){ctx.save();ctx.translate((i*160+t*420)%(w+250)-170,h*.53);ctx.rotate(-.38);ctx.fillStyle='#fff';ctx.fillRect(0,-h,14,h*2);ctx.restore();}
     ctx.globalAlpha=1;
-    const left=80,top=125,player=data().player||{},name=player.name||'CHOOSE A PLAYER';
+    const left=80,top=125,player=data().player||{},name=player.name||('PLAYER PROFILE UNAVAILABLE'+(player.id?' · ESPN #'+player.id:''));
     ctx.fillStyle='#fff';fitText(ctx,'LIVE',left,top,240,65);
     ctx.fillStyle=accent;fitText(ctx,'STAT',245,top,250,65);
     ctx.fillStyle='#c7c5cb';fitText(ctx,'ANALYTICS LAB  /  MOTION STUDIO',left,top+52,w-left*2,24,700);
@@ -112,7 +113,10 @@ export function createAnimatedCardsStudio({getData,refresh,notify=()=>{}}){
       ctx.globalAlpha=photoScale*.95;ctx.drawImage(headshot,x,y,pw,ph);ctx.globalAlpha=1;
     } else {
       const letters=name.trim().split(/\s+/).map(x=>x[0]||'').slice(0,2).join('').toUpperCase();
-      ctx.globalAlpha=.2*photoScale;ctx.fillStyle='#fff';fitText(ctx,letters,w*.54,h*.39,w*.42,260);ctx.globalAlpha=1;
+      ctx.globalAlpha=.20*photoScale;ctx.fillStyle='#fff';fitText(ctx,letters,w*.54,h*.39,w*.42,260);ctx.globalAlpha=1;
+      ctx.fillStyle='rgba(255,255,255,.65)';ctx.globalAlpha=photoScale;
+      fitText(ctx,state.imageStatus==='loading'?'LOADING HEADSHOT':'ESPN HEADSHOT UNAVAILABLE',w*.55,h*.43,w*.4,21,700);
+      ctx.globalAlpha=1;
     }
     const nameReveal=ease((p-.10)/.25);
     ctx.globalAlpha=nameReveal;
@@ -158,13 +162,39 @@ export function createAnimatedCardsStudio({getData,refresh,notify=()=>{}}){
     }
     ctx.fillStyle='#b7aeb7';fitText(ctx,'ESPN UNOFFICIAL · VERIFIED STATS ONLY',left,h-45,w-left*2,20,700);
   }
+  function updatePhotoCaption(){
+    const el=typeof document!=='undefined'?document.getElementById('animated-photo-status'):null;
+    if(el)el.textContent=state.imageStatus==='ready'?'PHOTO: ESPN headshot loaded':
+      state.imageStatus==='loading'?'PHOTO: Loading from ESPN…':
+      state.imageStatus==='failed'?'PHOTO: ESPN image unavailable; initials fallback used':
+      'PHOTO: ESPN headshot not provided';
+  }
   function loadHeadshot(){
     const src=String(data().player?.headshot||'');
     if(src===state.imageUrl)return;
-    state.imageUrl=src;state.image=null;
+    state.imageUrl=src;state.image=null;state.imagePromise=null;
+    state.imageStatus=ESPN_PHOTO.test(src)?'loading':'unavailable';
+    updatePhotoCaption();
     if(!ESPN_PHOTO.test(src))return;
-    const img=new Image();img.onload=()=>{if(state.imageUrl===src){state.image=img;if(!state.playing&&!state.exporting)draw(1)}};
-    img.onerror=()=>{};img.src='/api/analytics/headshot?url='+encodeURIComponent(src);
+    const img=new Image();
+    state.imagePromise=new Promise(resolve=>{
+      img.onload=()=>{
+        if(state.imageUrl===src){state.image=img;state.imageStatus='ready';updatePhotoCaption();
+          if(!state.playing&&!state.exporting)draw(1);}
+        resolve();
+      };
+      img.onerror=()=>{
+        if(state.imageUrl===src){state.imageStatus='failed';updatePhotoCaption();
+          if(!state.playing&&!state.exporting)draw(1);}
+        resolve();
+      };
+      img.src='/api/analytics/headshot?url='+encodeURIComponent(src);
+    });
+  }
+  async function awaitHeadshot(){
+    loadHeadshot();
+    if(state.imagePromise)await Promise.race([state.imagePromise,new Promise(resolve=>setTimeout(resolve,5000))]);
+    return state.imageStatus==='ready';
   }
   function afterRender(){loadHeadshot();draw(1)}
   function redraw(){loadHeadshot();draw(1)}
@@ -185,12 +215,16 @@ export function createAnimatedCardsStudio({getData,refresh,notify=()=>{}}){
     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);
   }
   async function png(){
+    if(!data().player?.name){notify('Player name unavailable. Select a player in Analytics Lab before exporting.');return;}
     if(!fieldRows().length){notify('No recorded stats for this player yet');return;}
+    await awaitHeadshot();
     draw(1);const canvas=document.getElementById('animated-preview-canvas');if(!canvas)return;
     await new Promise(resolve=>canvas.toBlob(blob=>{if(blob)download(blob,'png');else notify('PNG export failed');resolve()},'image/png'));
   }
   async function video(){
+    if(!data().player?.name){notify('Player name unavailable. Select a player in Analytics Lab before exporting.');return;}
     if(!fieldRows().length){notify('No recorded stats for this player yet');return;}
+    await awaitHeadshot();
     const canvas=document.getElementById('animated-preview-canvas');
     if(!canvas?.captureStream||typeof MediaRecorder==='undefined'){notify('This browser cannot record canvas video. Use PNG export or try a desktop browser.');return;}
     const formats=['video/mp4;codecs=avc1.42E01E','video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'];
