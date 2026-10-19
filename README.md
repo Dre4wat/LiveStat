@@ -2,6 +2,20 @@
 
 Cinematic black/red/white sports alerts prototype. Five leagues: NFL, NBA, college football, NCAA men's basketball and NCAA women's basketball. **No private code is needed**; the app opens directly to Select Sport.
 
+## Animated Stat Cards Studio — direct GitHub implementation
+
+Open **Analytics Lab**, choose a player with recorded ESPN statistics, then select **Animated Cards** or **Player Cards → Animate this Card**. Three templates are available:
+
+- **Performance Recap** — four available recorded stat values with animated count-ups and averages derived from the accessible game logs.
+- **Target Reached** — choose an available stat and target. Badge only displays "TARGET ACHIEVED" if the recorded stat meets that goal. A manually entered goal is a user-set threshold, not an invented player statistic.
+- **Mission Complete** — take milestones from the selected player's saved LiveStat alert loadout; goals are marked complete only when the corresponding game stats are present and meet each target.
+
+Export 1080×1080 square (Discord), 1080×1350 portrait (social feed), or 1080×1920 vertical (TikTok/Reels/Shorts). The animated canvas is rendered in the browser without an AI image/video service. **PNG export** is available; **video export** uses the browser's supported MediaRecorder formats, preferring MP4 when supported and otherwise WebM. **iPhone/Safari recording availability varies**, and a browser lacking canvas stream capture will be offered PNG instead; no guaranteed universal MP4 conversion on the free server.
+
+The studio reuses **current ESPN box-score statistics, historical game logs, real headshots via the restricted image proxy, and available team colors**. It never displays fabricated performances or unsourced milestone completions. Source data can be incomplete or delayed. No video clip licensing or paid API is required.
+
+Files: `public/animated-cards.js`, `public/analytics-lab.js`, `public/analytics-lab.css`; with updated PWA cache, interface entry, and `test/animated-cards.test.js`. This was added directly to the current v1.2+ GitHub repository; the separately generated old v0.8 ZIP is obsolete and **must not replace** the live site.
+
 ## LiveStat Analytics Lab (v1.2)
 
 Access **Analytics** from the desktop sidebar or iPhone bottom navigation. You can also open it from a selected player's Arena alert-loadout screen or from a saved player watch.
