@@ -78,3 +78,10 @@ test('Analytics Lab ESPN search respects the selected sport',async()=>{
     assert.match(requests[0],/sport=nba/);
   }finally{globalThis.fetch=original}
 });
+
+test('Formula Lab accepts ESPΝ percentage and numeric-leading statistic abbreviations',async()=>{
+  const {calculateFormula}=await import('../public/formula.js');
+  assert.equal(calculateFormula('FG% * 100 + 3PM',{ 'FG%':.5,'3PM':4 }),54);
+  assert.equal(calculateFormula('3PM + AST',{ '3PM':4,AST:9 }),13);
+  assert.throws(()=>calculateFormula('3PM + MISSING',{ '3PM':4 }),/Unavailable stat/);
+});
