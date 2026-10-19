@@ -1,7 +1,7 @@
 export function createInsights({api,escape,refresh,getWatches=()=>[],getAlerts=()=>[]}) {
   const esc=escape;
   const state={kind:'game',sport:'nba',game:null,details:null,loading:false,error:'',tab:'overview',selected:null,
-    tracker:null,profiles:null,league:null,leagueSection:'standings',profile:null,profileData:null,compare:[],pinned:[]};
+    tracker:null,profiles:null,league:null,leagueSection:'standings',profile:null,profileData:null,compare:[],pinned:[],gameReport:null,gameReportLoading:false};
   try{if(typeof localStorage!=='undefined')state.pinned=JSON.parse(localStorage.getItem('livestat-pinned')||'[]')}catch{state.pinned=[]}
   const names={nfl:'NFL',cfb:'College Football',nba:'NBA',ncaam:"Men's College Basketball",ncaaw:"Women's College Basketball"};
   const statNames={points:'PTS',rebounds:'REB',assists:'AST',steals:'STL',blocks:'BLK',threePointers:'3PM',turnovers:'TO',receptions:'REC',receivingYards:'REC YDS',targets:'TGTS',fumbles:'FUM',touchdowns:'TD',fieldGoals:'FG',sacks:'SACK'};
@@ -94,14 +94,33 @@ export function createInsights({api,escape,refresh,getWatches=()=>[],getAlerts=(
     });
     return `<section class="ls-i-panel"><h2>CLUTCH TIME</h2><p>Fourth period or later, final two minutes, within eight points.</p></section>${timeline(plays,'CLOSE-FINISH EVENTS')}`;
   }
+  function gameAnalystView(){
+    const report=state.gameReport?.analysis;
+    return '<section class="ls-i-panel"><div class="ls-i-panel-head"><h2>GAME ANALYST</h2><button data-action="intel-analyze">↻ REFRESH REPORT</button></div>'+
+      '<p class="ls-i-muted">Descriptions are computed from actual ESPN scoring events and box scores. Missing data is never invented.</p>'+
+      (state.gameReportLoading?notice('Analyzing recorded game events…'):
+       report?'<div class="ls-i-analysis"><small>EVIDENCE-BASED REPORT · NOT AI-GENERATED</small><p>'+esc(report.summary)+'</p></div>'+
+         '<h3>DATA SOURCES</h3><div class="ls-i-evidence">'+(report.evidence||[]).map(e=>'<div><strong>'+esc(e.source)+'</strong><span>'+esc(e.detail)+'</span></div>').join('')+'</div>'
+       :notice('Select Refresh Report to analyze this game.'))+'</section>';
+  }
+  async function loadGameReport(){
+    if(!state.game?.id||state.gameReportLoading)return;
+    const gameId=String(state.game.id),sport=state.sport;
+    state.gameReportLoading=true;refresh();
+    try{
+      const value=await api('/api/analytics/game?sport='+encodeURIComponent(sport)+'&game='+encodeURIComponent(gameId));
+      if(state.game?.id===gameId&&state.sport===sport)state.gameReport=value;
+    }catch(err){state.gameReport={analysis:{summary:'Game analysis unavailable: '+(err.message||'Provider error'),evidence:[]}};}
+    finally{state.gameReportLoading=false;refresh()}
+  }
   function gameView(){
     if(state.loading&&!state.details)return notice('Loading play-by-play, momentum, drives and game intelligence…');
     const d=state.details||{};
-    const items=[['overview','OVERVIEW'],['plays','PLAY-BY-PLAY'],['momentum','MOMENTUM'],['scoring','SCORING'],['clutch','CLUTCH'],['replay','REPLAY'],...(isFootball()?[['drives','DRIVES']]:[['shots','SHOT CHART']])];
+    const items=[['overview','OVERVIEW'],['plays','PLAY-BY-PLAY'],['momentum','MOMENTUM'],['scoring','SCORING'],['clutch','CLUTCH'],['analyst','GAME ANALYST'],['replay','REPLAY'],...(isFootball()?[['drives','DRIVES']]:[['shots','SHOT CHART']])];
     const p=state.selected&&d.plays?.find(x=>x.id===state.selected);
     return `<div class="ls-i-actions"><button data-action="intel-back">← BACK TO GAMES</button><button data-action="intel-reload">↻ REFRESH</button></div>${gameHeader()}
     ${state.error?notice(state.error):''}${tabs(items)}${p?`<div class="ls-i-selected"><button data-action="intel-clear">✕</button><strong>${esc(clock(p))}</strong><p>${esc(p.text)}</p>${p.homeScore!=null?`<small>HOME ${p.homeScore} · AWAY ${p.awayScore}</small>`:''}</div>`:''}
-    ${state.tab==='plays'?timeline(d.plays,'PLAY BY PLAY'):state.tab==='momentum'?momentumView():state.tab==='scoring'?timeline(d.scoring,'SCORING SUMMARY'):state.tab==='clutch'?clutchView():state.tab==='drives'?driveView():state.tab==='shots'?shotsView():state.tab==='replay'?`<div class="ls-i-panel"><h2>PERSONAL GAME REPLAY</h2><p>Review scoring plays and personalized alert events after the game. Video playback is not included.</p><button class="ls-i-replay" data-action="intel-copy">COPY TEXT RECAP</button>${(()=>{const entries=(getAlerts()||[]).filter(x=>x.sport===state.sport&&x.game&&(x.game===state.game?.name||x.game.includes(state.game?.name||'____')));return entries.length?`<div class="ls-i-timeline">${entries.slice(0,60).map(x=>`<div class="ls-i-log"><strong>${esc(x.name)} — ${esc(x.label)}</strong><p>${esc(x.detail)}</p></div>`).join('')}</div>`:notice('No saved alerts associated with this game yet.')})()}</div>${timeline(d.scoring,'SCORING HIGHLIGHTS')}`:overview()}`;
+    ${state.tab==='analyst'?gameAnalystView():state.tab==='plays'?timeline(d.plays,'PLAY BY PLAY'):state.tab==='momentum'?momentumView():state.tab==='scoring'?timeline(d.scoring,'SCORING SUMMARY'):state.tab==='clutch'?clutchView():state.tab==='drives'?driveView():state.tab==='shots'?shotsView():state.tab==='replay'?`<div class="ls-i-panel"><h2>PERSONAL GAME REPLAY</h2><p>Review scoring plays and personalized alert events after the game. Video playback is not included.</p><button class="ls-i-replay" data-action="intel-copy">COPY TEXT RECAP</button>${(()=>{const entries=(getAlerts()||[]).filter(x=>x.sport===state.sport&&x.game&&(x.game===state.game?.name||x.game.includes(state.game?.name||'____')));return entries.length?`<div class="ls-i-timeline">${entries.slice(0,60).map(x=>`<div class="ls-i-log"><strong>${esc(x.name)} — ${esc(x.label)}</strong><p>${esc(x.detail)}</p></div>`).join('')}</div>`:notice('No saved alerts associated with this game yet.')})()}</div>${timeline(d.scoring,'SCORING HIGHLIGHTS')}`:overview()}`;
   }
   function tableFromStats(stats){
     const categories=stats?.categories||[];
@@ -159,7 +178,7 @@ export function createInsights({api,escape,refresh,getWatches=()=>[],getAlerts=(
   }
   function openGame(sport,game){
     if(!game?.id)return;
-    state.kind='game';state.sport=sport;state.game=game;state.tab='overview';state.selected=null;state.details=null;state.error='';
+    state.kind='game';state.sport=sport;state.game=game;state.tab='overview';state.selected=null;state.details=null;state.error='';state.gameReport=null;
     return reload();
   }
   function openCommand(){state.kind='command';state.error='';return reload()}
@@ -178,7 +197,8 @@ export function createInsights({api,escape,refresh,getWatches=()=>[],getAlerts=(
       try{if(typeof localStorage!=='undefined')localStorage.setItem('livestat-pinned',JSON.stringify(state.pinned))}catch{}
       refresh();return true;
     }
-    if(action==='intel-tab'){state.tab=node.dataset.value;state.selected=null;refresh();return true}
+    if(action==='intel-tab'){state.tab=node.dataset.value;state.selected=null;refresh();if(state.tab==='analyst'&&!state.gameReport)loadGameReport();return true}
+    if(action==='intel-analyze'){loadGameReport();return true}
     if(action==='intel-play'){state.selected=node.dataset.play;refresh();return true}
     if(action==='intel-clear'){state.selected=null;refresh();return true}
     if(action==='intel-reload'){reload();return true}
