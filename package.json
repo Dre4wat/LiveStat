@@ -1,9 +1,9 @@
 {
   "name": "livestat-public-arena",
-  "version": "0.7.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
-  "description": "Cinematic sports-game inspired, game-first per-play and milestone alert PWA prototype",
+  "description": "Multi-sport live alerts, player cards, statistical analysis and historical archive",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
@@ -13,6 +13,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "pg": "^8.13.1"
   }
 }
