@@ -172,3 +172,16 @@
 @media(max-width:760px){.animated-control-layout{grid-template-columns:1fr}.animated-preview{order:-1}.animated-preview canvas{max-height:520px}.animated-creator{padding:13px}.animated-preview-header{flex-wrap:wrap}}
 
 .lab-motion-link{border:1px solid #fa6073;background:#a82337;color:#fff;font-size:11px;font-weight:900;border-radius:8px;padding:10px 12px}
+
+/* Verified performance cards and multi-season analytics */
+.lab-highlights{margin:23px 0 0;border-top:1px solid #5b3541;padding-top:20px}
+.lab-highlight-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.lab-highlight-grid button{display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:15px;border:1px solid #613443;border-radius:11px;background:#281823;color:#fff;text-align:left;min-width:0}
+.lab-highlight-grid button.selected{border-color:#fe6579;background:#551b2c}
+.lab-highlight-grid button strong{font-size:13px;color:#fff}
+.lab-highlight-grid button span{font-size:11px;color:#e1afbb}
+.lab-highlight-grid button small{color:#ff8da0;font-size:10px}
+.lab-highlight-grid button b{font-size:10px;letter-spacing:.5px}
+.lab-career-chart{min-height:180px;margin:16px 0;border:1px solid #633441;background:#171117;border-radius:11px;padding:13px}
+.lab-career-chart svg{width:100%;height:230px}
+@media(max-width:700px){.lab-highlight-grid{grid-template-columns:1fr}.lab-career-chart svg{height:180px}}
