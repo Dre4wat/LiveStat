@@ -261,7 +261,7 @@ async function handle(req,res){
       const {sport}=providerFrom(url),athlete=url.searchParams.get('athlete')||'';
       if(!/^[0-9]{1,14}$/.test(athlete))throw Error('Invalid athlete');
       const seasons=await listArchivedSeasons(sport,athlete).catch(()=>[]);
-      return send(res,200,{seasons,mode:archiveMode(),durable:archiveMode()!=='ephemeral-disk',
+      return send(res,200,{seasons,mode:archiveMode(),durable:archiveMode()==='postgresql'||process.env.LIVESTAT_PERSISTENT_DISK==='true',
         note:archiveMode()==='ephemeral-disk'?'Free Render storage is temporary; connect PostgreSQL to retain seasons after restart.':null});
     }
     if(req.method==='GET'&&route==='/api/analytics/career-report'){
