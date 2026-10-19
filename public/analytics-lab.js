@@ -150,8 +150,24 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    const n=mean(rows(),metric);
    return n==null?{avg:null,avgSource:null}:{avg:fmt(n),avgSource:'SAMPLE AVG'};
  }
+ function highlightGallery(){
+   return [...(state.data?.milestones||[]),...(state.data?.missions||[])].slice(0,55);
+ }
+ function selectHighlight(id){
+   const item=highlightGallery().find(x=>x.id===id);
+   if(!item)return;
+   state.selectedMilestone=item;state.cardMode='milestone';refresh();
+ }
  function cardMetrics(){
    const list=rows(),last=list[0],avail=labels();
+   if(state.cardMode==='milestone'){
+     const event=state.selectedMilestone;
+     if(!event)return [];
+     const preferred=['PTS','REB','AST','STL','BLK','3PM','PASSYDS','PASSTD','RUSHYDS','RUSHTD','RECYDS','REC','DEFTOT','DEFSACKS','DEFINT'];
+     const stats=event.gameStats||{};
+     return preferred.filter(k=>stats[k]!=null&&Number.isFinite(Number(stats[k]))).slice(0,4)
+       .map(k=>({label:k,value:stats[k],...cardAverage(k)}));
+   }
    if(state.cardMode==='live'){
      if(!state.current?.available)return [];
      const data=state.current.stats||{};
@@ -173,12 +189,20 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    const cardStats=cardMetrics();
    return `<section class="lab-panel"><div class="lab-panel-title"><h3>PLAYER CARD STUDIO</h3><button class="lab-motion-link" data-action="lab-tab" data-value="animated">▶ ANIMATE THIS CARD ↗</button></div>
    <div class="lab-row-actions"><label>STYLE<select id="lab-theme">${['redline','silver','midnight'].map(x=>`<option value="${x}" ${state.cardTheme===x?'selected':''}>${x.toUpperCase()}</option>`).join('')}</select></label>
-   <label>CARD TYPE<select id="lab-card-mode">${[...(state.currentGame?.gameId?[['live','Selected game box score']]:[]),['latest','Latest recorded game'],['average','Game-log average'],['best','Best game in sample']].map(([id,name])=>`<option value="${id}" ${state.cardMode===id?'selected':''}>${name}</option>`).join('')}</select></label>
+   <label>CARD TYPE<select id="lab-card-mode">${[...(state.currentGame?.gameId?[['live','Selected game box score']]:[]),['latest','Latest recorded game'],['average','Game-log average'],['best','Best game in sample'],...(state.selectedMilestone?[['milestone','Selected milestone']]:[])].map(([id,name])=>`<option value="${id}" ${state.cardMode===id?'selected':''}>${name}</option>`).join('')}</select></label>
    <button data-action="lab-export-png">↓ DOWNLOAD PNG</button></div>
    <div class="lab-card-preview theme-${escape(state.cardTheme)}"><div class="lab-card-brand">LIVE<span>STAT</span><small>PERFORMANCE CARD</small></div>
     <div class="lab-card-hero">${player.headshot?`<img alt="" src="/api/analytics/headshot?url=${encodeURIComponent(player.headshot)}" onerror="this.style.display='none'" />`:''}<div><small>${escape(player.team||'TEAM DATA UNAVAILABLE')}</small><h2>${escape(player.name||'PLAYER')}</h2><p>${escape(player.position||sports[state.sport])}</p></div></div>
     <div class="lab-card-metrics">${cardStats.map(x=>`<div><strong>${escape(x.value??'—')}</strong><small>${escape(x.label)}</small>${x.avg!=null?`<small>${escape(x.avgSource||'SAMPLE AVG')} ${escape(x.avg)}</small>`:''} </div>`).join('')}</div>
     <footer>ESPN UNOFFICIAL · ${escape(state.season)} · ${escape(state.cardMode.toUpperCase())}</footer></div>
+   <div class="lab-highlights"><div class="lab-panel-title"><h3>AUTO-DETECTED HIGHLIGHT CARDS</h3><span>${highlightGallery().length} AVAILABLE</span></div>
+     <p class="lab-muted">Automatically found in ESPN's recorded game logs. A highlight is not labeled a career record without complete historical data.</p>
+     <div class="lab-highlight-grid">${highlightGallery().slice(0,24).map(item=>`<button data-action="lab-card-highlight" data-id="${escape(item.id)}" class="${state.selectedMilestone?.id===item.id?'selected':''}">
+       <strong>${escape(item.name)}</strong><span>${escape(item.opponent||'Opponent unknown')} · ${escape((item.date||'').slice(0,10))}</span>
+       <small>${item.type==='mission'?'TRACKED MISSION':escape(item.metric)+' · '+escape(item.value)}</small>
+       <b>USE THIS CARD →</b></button>`).join('')}</div>
+     ${!highlightGallery().length?'<div class="lab-empty">No qualifying milestone or saved goal found in the recorded games for this season.</div>':''}
+   </div>
    <p class="lab-muted">${state.cardMode==='live'?(state.current?.available?'From selected-game ESPN box score · '+escape(state.current.status||'Game status unavailable'):'No selected-game box-score stats available yet.'):'Based on recorded games. Comparison values use ESPN season averages where clearly identified for basketball; otherwise they use available game-log sample averages.'} Headshots appear only when provided by ESPN.</p></section>`;
  }
  function formulaView(){
@@ -216,7 +240,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    try{
      const x=await api('/api/analytics/player?sport='+encodeURIComponent(state.sport)+'&athlete='+encodeURIComponent(state.player.id)+'&season='+year);
      if(identity!==state.sport+':'+state.player?.id||year!==state.season)return;
-     state.data=x.analytics;state.player={...state.player,...Object.fromEntries(Object.entries(x.analytics.player||{}).filter(([,v])=>v!=null&&v!==''))};
+     state.selectedMilestone=null;if(state.cardMode==='milestone')state.cardMode='latest';state.data=x.analytics;state.player={...state.player,...Object.fromEntries(Object.entries(x.analytics.player||{}).filter(([,v])=>v!=null&&v!==''))};
      ensureMetrics();state.report=null;state.formulaResult=null;
      try{const saved=await api('/api/analytics/archive?sport='+state.sport+'&athlete='+state.player.id);state.archiveStorage=saved;}catch{state.archiveStorage=null}
      if(state.currentGame?.gameId&&state.currentGame?.teamId){
@@ -312,7 +336,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
      const player={...state.player,...state.data.player};
      const metrics=cardMetrics();
      await exportPlayerCard({player,sport:state.sport,season:state.season,theme:state.cardTheme,metrics,
-       title:state.cardMode==='live'?'SELECTED GAME BOX SCORE':state.cardMode==='average'?'GAME LOG AVERAGE':state.cardMode==='best'?'SEASON BEST':'LATEST RECORDED GAME',
+       title:state.cardMode==='milestone'?(state.selectedMilestone?.name||'VERIFIED MILESTONE'):state.cardMode==='live'?'SELECTED GAME BOX SCORE':state.cardMode==='average'?'GAME LOG AVERAGE':state.cardMode==='best'?'SEASON BEST':'LATEST RECORDED GAME',
        filename:'livestat-'+state.player.name+'-'+state.season});
      toast('Player card PNG created');
    }catch(e){toast(e.message||'Card export failed')}
@@ -343,6 +367,7 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    if(action==='lab-metric-toggle'){toggleMetric(node.dataset.metric);return true}
    if(action==='lab-up'){shiftMetric(node.dataset.metric,-1);return true}
    if(action==='lab-down'){shiftMetric(node.dataset.metric,1);return true}
+   if(action==='lab-card-highlight'){selectHighlight(node.dataset.id);return true}
    if(action==='lab-export-png'){png();return true}
    if(action==='lab-formula-run'){runFormula();return true}
    if(action==='lab-formula-insert'){state.formula=(state.formula.trim()?state.formula+' + ':'')+node.dataset.metric;refresh();return true}
