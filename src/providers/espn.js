@@ -119,7 +119,7 @@ export function espnProviderFor(sport){
   },
   async searchAthletes(query){
     if(typeof query!=='string'||query.trim().length<2||query.trim().length>70)throw Error('Search needs 2–70 characters');
-    const data=await getPublic('https://site.web.api.espn.com/apis/search/v2?query='+encodeURIComponent(query)+'&limit=50');
+    const data=await getPublic('https://site.web.api.espn.com/apis/search/v2?query='+encodeURIComponent(query)+'&sport='+encodeURIComponent(sport)+'&limit=50');
     return normalizeESPNPlayerSearch(data,query,sport);
   },
   async standings(){
