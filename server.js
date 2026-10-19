@@ -8,6 +8,7 @@ import {extractBoxTotals} from './src/providers/intelligence.js';
 import {analyzePlayer,analyzeGameData} from './src/providers/analytics.js';
 import {fetchOrArchivePlayer,listArchivedSeasons,archiveMode} from './src/engine/analytics-archive.js';
 import {detectPlayerMilestones,detectMissionHighlights} from './src/providers/milestones.js';
+import {formAnalysis} from './src/providers/trends.js';
 import {makeMonitor} from './src/engine/monitor.js';
 import {normalizeWatch,matchPlay} from './src/engine/events.js';
 import {loadStore,writeStore} from './src/engine/store.js';
@@ -301,7 +302,11 @@ async function handle(req,res){
       if(!espnProviders[sport]||!/^[0-9]{1,14}$/.test(athlete)||
          !Number.isInteger(season)||season<1980||season>new Date().getUTCFullYear()+2||!metric)throw Error('Invalid analyst request');
       const data=await getHistoricalPlayer(sport,athlete,season);
-      const evidence=analyzePlayer(data.player,data.history.games,metric);
+      const baseline=analyzePlayer(data.player,data.history.games,metric);
+      const form=formAnalysis(data.history.games,metric);
+      const sentences=[...baseline.sentences,...(form.observations||[]).filter(x=>!baseline.sentences.some(y=>y===x))];
+      const evidence={...baseline,form,evidence:form.evidence||[],sentences,
+        summary:sentences.length?sentences.join(' '):baseline.summary,historySource:data.archive||null};
       if(reqData.ai!==true)return send(res,200,{analysis:evidence,mode:'statistical',historySource:data.archive||null});
       if(!process.env.OPENAI_API_KEY)return send(res,200,{analysis:evidence,mode:'statistical',warning:'AI service not configured; showing sourced statistical analysis.'});
       const now=Date.now(),last=analystCooldown.get(ownerId)||0;
