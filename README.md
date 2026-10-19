@@ -1,6 +1,51 @@
-# LiveStat Arena v1.0 — sports intelligence prototype
+# LiveStat Arena v1.2 — Arena + Analytics Lab
 
 Cinematic black/red/white sports alerts prototype. Five leagues: NFL, NBA, college football, NCAA men's basketball and NCAA women's basketball. **No private code is needed**; the app opens directly to Select Sport.
+
+## LiveStat Analytics Lab (v1.2)
+
+Access **Analytics** from the desktop sidebar or iPhone bottom navigation. You can also open it from a selected player's Arena alert-loadout screen or from a saved player watch.
+
+### Player History & Trends
+- Select one of the five leagues, search an ESPN athlete by name or enter a numeric ESPN athlete ID.
+- Choose a historical season and inspect **only the games ESPN returned**: individual games, opponents, results, stat columns, a line chart, sample game-log averages, and downloadable CSV.
+- Compare two seasons or request a four-season archive; unavailable years remain empty. Season averages derived from the accessible game log are labeled **sample averages** and not misrepresented as official full-season stats.
+
+### Custom Stat Dashboards
+- Add/remove stat tiles, move them left/right, choose the displayed trend metric, and save separately named dashboard layouts.
+- Layout preferences persist in the same browser's local storage. They do not yet sync between devices.
+
+### Player Card Studio
+- Create an actual **1080 × 1350 PNG**, with player name, position, ESPN headshot where supplied, sports colors and recorded stats.
+- Modes: last recorded game, game-log average, best game in the accessible sample, or **selected-game box score** when opened from Arena with a valid game and team.
+- The card displays comparison averages where possible. It uses a restricted ESPN-image proxy for canvas safety and falls back to an initials graphic if the headshot is unavailable.
+- **Share** using the saved PNG; no misleading fabricated numbers or generated portraits.
+
+### Formula Lab
+- Construct custom indexes, such as `PTS + REB + AST` or `(PTS + 2 * AST) / 3`.
+- Calculator supports numeric fields available in the latest recorded game, arithmetic and parentheses. It never runs user-supplied JavaScript.
+
+### Player and Game Analyst
+- The Lab's **Game Analyst** tab produces natural-language facts based on the athlete's **recorded game logs**: recent changes, samples, latest game and best performance.
+- The Arena **Game Center → Game Analyst** tab describes scoring by period, recorded lead changes, quarter advantages, box-score leaders, and football third-down rates *only when data supports those claims*.
+- Statistical analysis is free and deterministic; it is **not an LLM**. The optional **Try AI Explanation** button can use a server-side `OPENAI_API_KEY` and optional `LIVESTAT_AI_MODEL` environment variable for language refinement. Without configuration, it transparently falls back to a free statistical report. Do not place an API key in public GitHub files or browser JavaScript.
+- ESPN data feeds are unofficial and may omit some leagues/years/stats; results are not guaranteed complete. Report sources explicitly reflect this uncertainty.
+
+### API routes
+
+`GET /api/analytics/search?sport=nba&q=LeBron`
+
+`GET /api/analytics/player?sport=nba&athlete=1966&season=2025`
+
+`GET /api/analytics/current?sport=nba&athlete=1966&team=13&game=401000001`
+
+`GET /api/analytics/game?sport=nba&game=401000001`
+
+`POST /api/analytics/analyst` using `{sport,athlete,season,metric,ai}`
+
+`GET /api/analytics/headshot?url=...` accepts only the approved ESPN CDN headshot/team image directories.
+
+All changes use the same existing Node.js server and Render deployment; no new npm dependency is required.
 
 ## Position-first player selection (v1.1)
 
