@@ -126,3 +126,61 @@ export function normalizeESPNPlayerSearch(raw,query,sport){
   visit(raw);
   return results.slice(0,35);
 }
+
+export function analyzeGameData(insights,box){
+  const observations=[],evidence=[];
+  const teams=asArray(insights?.teams);
+  const home=teams.find(t=>t.side==='home')||teams[1]||{};
+  const away=teams.find(t=>t.side==='away')||teams[0]||{};
+  const homeName=text(home.abbr||home.name||'Home'),awayName=text(away.abbr||away.name||'Away');
+  const periodRows=asArray(insights?.periods).filter(p=>Number.isFinite(p.home)&&Number.isFinite(p.away));
+  const formatPeriod=p=>Number(p)>4?'OT '+(p-4):'Q'+p;
+  if(periodRows.length){
+    const best=periodRows.reduce((a,b)=>Math.abs(b.home-b.away)>Math.abs(a.home-a.away)?b:a);
+    const dominant=best.home>best.away?homeName:best.home<best.away?awayName:'Neither team';
+    if(best.home!==best.away)observations.push(dominant+' had the largest single-period scoring advantage in '+formatPeriod(best.period)+': '+Math.max(best.home,best.away)+'–'+Math.min(best.home,best.away)+'.');
+    evidence.push({source:'Play-by-play score changes',detail:'Quarter-by-quarter scores derived from supplied scoring events'});
+    const last=periodRows.at(-1),prior=periodRows.at(-2);
+    if(prior&&last&&last.period!==prior.period){
+      const homeDelta=last.home-prior.home,awayDelta=last.away-prior.away;
+      const who=homeDelta>awayDelta?homeName:awayDelta>homeDelta?awayName:null;
+      if(who)observations.push(who+' scored '+Math.abs(homeDelta-awayDelta)+' more point'+(Math.abs(homeDelta-awayDelta)===1?'':'s')+' in '+formatPeriod(last.period)+' than in the preceding period (relative scoring change).');
+    }
+  }
+  const m=insights?.momentumSummary||{};
+  if(Number.isInteger(m.leadChanges)&&m.leadChanges>0){
+    observations.push('The lead changed '+m.leadChanges+' time'+(m.leadChanges===1?'':'s')+' in the recorded scoring sequence.');
+    evidence.push({source:'Play-by-play scores',detail:'Leader changes exclude tied score states'});
+  }
+  if(Number.isFinite(m.biggestHomeLead)&&m.biggestHomeLead>0)observations.push(homeName+' led by as many as '+m.biggestHomeLead+' points.');
+  if(Number.isFinite(m.biggestAwayLead)&&m.biggestAwayLead>0)observations.push(awayName+' led by as many as '+m.biggestAwayLead+' points.');
+  const boxes=asArray(box?.teams);
+  for(const t of boxes){
+    const name=text(t.abbr||t.name||'Team');
+    const third=asArray(t.stats).find(x=>/third.?down|3rd.?down/i.test(text(x.name)+' '+text(x.label)));
+    if(third&&third.value){
+      observations.push(name+' third-down efficiency: '+text(third.value)+' (ESPN team box score).');
+      evidence.push({source:'Team box score',detail:name+' '+text(third.label||third.name)});
+    }
+  }
+  if(['nba','ncaam','ncaaw'].includes(insights?.sport)){
+    const leaders=[];
+    for(const g of asArray(box?.groups)){
+      for(const section of asArray(g.sections)){
+        const index=asArray(section.labels).findIndex(k=>text(k).toUpperCase()==='PTS');
+        if(index<0)continue;
+        for(const p of asArray(section.rows)){
+          const value=numeric(p.stats?.[index]);
+          if(value!=null)leaders.push({name:p.name,points:value});
+        }
+      }
+    }
+    leaders.sort((a,b)=>b.points-a.points);
+    if(leaders.length){
+      observations.push('Top recorded scorer in the available box score: '+leaders[0].name+' with '+leaders[0].points+' points.');
+      evidence.push({source:'Player box score',detail:'PTS column'});
+    }
+  }
+  if(!observations.length)return {mode:'statistical',summary:'There are not enough verified plays or box-score statistics to describe this game yet.',observations:[],evidence:[]};
+  return {mode:'statistical',summary:observations.slice(0,7).join(' '),observations:observations.slice(0,7),evidence:evidence.slice(0,7)};
+}
