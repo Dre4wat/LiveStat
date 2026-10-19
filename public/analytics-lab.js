@@ -123,6 +123,17 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    ${state.archive.length?`<div class="lab-archive"><h3>HISTORICAL ARCHIVE</h3>${state.archive.map(item=>`<div><strong>${item.season}</strong><span>${item.history?.games?.length||0} recorded games</span><span>${fmt(mean(item.history?.games||[],state.metric))} ${escape(state.metric||'')}</span></div>`).join('')}</div>`:''}
    <p class="lab-muted">Game-log averages are calculated from the games ESPN returned, not assumed to be complete season totals. A season may be unavailable.</p></section>`;
  }
+ function cardAverage(metric){
+   const basketball=['nba','ncaam','ncaaw'].includes(state.sport);
+   if(basketball){
+     const categories=state.data?.seasonStats?.categories||[];
+     const official=categories.find(c=>/^(general|averages?|per.?game)$/i.test(String(c.name||'').trim()));
+     const n=Number(official?.values?.[metric]);
+     if(official&&official.values?.[metric]!=null&&Number.isFinite(n))return {avg:fmt(n),avgSource:'ESPN SEASON AVG'};
+   }
+   const n=mean(rows(),metric);
+   return n==null?{avg:null,avgSource:null}:{avg:fmt(n),avgSource:'SAMPLE AVG'};
+ }
  function cardMetrics(){
    const list=rows(),last=list[0],avail=labels();
    if(state.cardMode==='live'){
@@ -132,12 +143,14 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
      const entries=Object.keys(data).sort((a,b)=>favored.indexOf(a)<0?1:favored.indexOf(b)<0?-1:favored.indexOf(a)-favored.indexOf(b)).slice(0,4);
      const labels={points:'PTS',rebounds:'REB',assists:'AST',threePointers:'3PM',passingYards:'PASS YDS',passingTouchdowns:'PASS TD',
        rushingYards:'RUSH YDS',rushingTouchdowns:'RUSH TD',receivingYards:'REC YDS',receptions:'REC',tackles:'TACKLES',sacks:'SACKS',interceptionsCaught:'INT'};
-     const lookup={points:'PTS',rebounds:'REB',assists:'AST',threePointers:'3PM',tackles:'TOT',sacks:'SACKS',receptions:'REC'};
-     return entries.map(k=>({label:labels[k]||k,value:data[k],avg:lookup[k]?fmt(mean(list,lookup[k])):null}));
+     const lookup={points:'PTS',rebounds:'REB',assists:'AST',threePointers:'3PM',passingYards:'PASSYDS',passingTouchdowns:'PASSTD',
+        rushingYards:'RUSHYDS',rushingTouchdowns:'RUSHTD',receivingYards:'RECYDS',receivingTouchdowns:'RECTD',
+        tackles:'TOT',sacks:'SACKS',receptions:'REC'};
+     return entries.map(k=>({label:labels[k]||k,value:data[k],...(lookup[k]?cardAverage(lookup[k]):{avg:null,avgSource:null})}));
    }
    const selected=(currentMetrics().length?currentMetrics():avail).slice(0,4);
    const best=state.cardMode==='best'?list.reduce((a,b)=>b.stats?.[state.metric]>a?.stats?.[state.metric]?b:a,last):last;
-   return selected.map(k=>({label:k,value:state.cardMode==='average'?fmt(mean(list,k)):best?.stats?.[k]??null,avg:fmt(mean(list,k))}));
+   return selected.map(k=>({label:k,value:state.cardMode==='average'?fmt(mean(list,k)):best?.stats?.[k]??null,...cardAverage(k)}));
  }
  function cardView(){
    const player=state.data?.player||state.player||{};
@@ -148,9 +161,9 @@ export function createAnalyticsLab({api,refresh,toast=()=>{},getWatches=()=>[],c
    <button data-action="lab-export-png">↓ DOWNLOAD PNG</button></div>
    <div class="lab-card-preview theme-${escape(state.cardTheme)}"><div class="lab-card-brand">LIVE<span>STAT</span><small>PERFORMANCE CARD</small></div>
     <div class="lab-card-hero">${player.headshot?`<img alt="" src="/api/analytics/headshot?url=${encodeURIComponent(player.headshot)}" onerror="this.style.display='none'" />`:''}<div><small>${escape(player.team||'TEAM DATA UNAVAILABLE')}</small><h2>${escape(player.name||'PLAYER')}</h2><p>${escape(player.position||sports[state.sport])}</p></div></div>
-    <div class="lab-card-metrics">${cardStats.map(x=>`<div><strong>${escape(x.value??'—')}</strong><small>${escape(x.label)}</small>${x.avg!=null?`<small>AVG ${escape(x.avg)}</small>`:''} </div>`).join('')}</div>
+    <div class="lab-card-metrics">${cardStats.map(x=>`<div><strong>${escape(x.value??'—')}</strong><small>${escape(x.label)}</small>${x.avg!=null?`<small>${escape(x.avgSource||'SAMPLE AVG')} ${escape(x.avg)}</small>`:''} </div>`).join('')}</div>
     <footer>ESPN UNOFFICIAL · ${escape(state.season)} · ${escape(state.cardMode.toUpperCase())}</footer></div>
-   <p class="lab-muted">${state.cardMode==='live'?(state.current?.available?'From selected-game ESPN box score · '+escape(state.current.status||'Game status unavailable'):'No selected-game box-score stats available yet.'):'Based on recorded games. AVG values reflect the available sample, not necessarily the full season.'} Headshots appear only when provided by ESPN.</p></section>`;
+   <p class="lab-muted">${state.cardMode==='live'?(state.current?.available?'From selected-game ESPN box score · '+escape(state.current.status||'Game status unavailable'):'No selected-game box-score stats available yet.'):'Based on recorded games. Comparison values use ESPN season averages where clearly identified for basketball; otherwise they use available game-log sample averages.'} Headshots appear only when provided by ESPN.</p></section>`;
  }
  function formulaView(){
    const game=latest(),res=state.formulaResult;
