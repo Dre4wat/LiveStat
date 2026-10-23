@@ -51,7 +51,7 @@ export function rosterSeasonSummary(sport,games){
     rushingTouchdowns:'RUSHTD',receivingYards:'RECYDS',receivingTouchdowns:'RECTD',
     interceptionsThrown:'PASSINT',interceptionsCaught:'DEFINT',
     receptions:'REC',tackles:'DEFTOT',sacks:'DEFSACKS',
-    points:'PTS',rebounds:'REB',assists:'AST'
+    points:'PTS',rebounds:'REB',assists:'AST',TO:'TOV',TRB:'REB',rebound:'REB','3PT':'3PM','3P':'3PM'
   };
   for(const game of list){
     if(!game?.stats)continue;
