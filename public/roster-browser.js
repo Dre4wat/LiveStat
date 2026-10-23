@@ -113,7 +113,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
    const list=sortedList(),columns=getColumns();
    const heading='<div class="gp-table-head"><div><strong>'+esc(team().name||'')+' ROSTER</strong><small id="gp-roster-total">'+
     list.length+' players · tap a player to feature them</small></div><div class="gp-roster-source">'+
-    (state.loadingStats?'LOADING STATS · ':'')+(football(state.sport)?'TOTALS':'PER GAME')+
+    (state.loadingStats?'LOADING STATS · ':'')+(sampleMode()==='total'?'TOTALS':'PER GAME')+
     ' · ESPN SEASON STATS + GAME LOGS</div></div>';
    return heading+'<div class="gp-roster-table-scroll"><table class="gp-roster-table"><thead><tr>'+
      '<th class="gp-rank-col">#</th><th class="gp-name-col">PLAYER</th><th>POS</th><th>JERSEY</th>'+
