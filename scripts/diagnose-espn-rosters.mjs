@@ -33,3 +33,22 @@ for(const [sport,athlete,year] of [
   }).slice(0,3600));
  }catch(err){console.log('RAW_STATS '+sport+': unavailable: '+err.message)}
 }
+
+for(const [sport,athlete,year] of [
+ ['basketball/nba','1966',2025],
+ ['football/nfl','3139477',2025]
+]){
+ const url='https://site.web.api.espn.com/apis/common/v3/sports/'+sport+'/athletes/'+athlete+'/gamelog?season='+year;
+ try{
+  const response=await fetch(url,{signal:AbortSignal.timeout(9000)});
+  const raw=await response.json();
+  console.log('RAW_GAMELOG '+sport+': '+JSON.stringify({
+   status:response.status,keys:Object.keys(raw),
+   filters:raw.filters?.map(f=>({name:f.name,value:f.value,displayName:f.displayName,options:f.options?.slice(0,2)})),
+   labels:raw.labels?.slice(0,20),
+   topEvents: Array.isArray(raw.events)?raw.events.length:Object.keys(raw.events||{}).length,
+   types:raw.seasonTypes?.map(x=>({name:x.displayName,type:x.type,
+     categories:x.categories?.map(y=>({name:y.name,displayName:y.displayName,labels:y.labels?.slice(0,16),n:y.events?.length,first:y.events?.[0]}))}))
+  }).slice(0,5400));
+ }catch(err){console.log('RAW_GAMELOG '+sport+': unavailable: '+err.message)}
+}
