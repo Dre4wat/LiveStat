@@ -144,15 +144,21 @@ export function espnProviderFor(sport){
       '/athletes/'+athleteId+'/';
     // Season stats are cheaper and more complete than reconstructing seasons
     // from game logs, particularly for defense and special teams.
+    // ESPN sometimes returns CAREER totals for /stats?season=YYYY, with no
+    // "season" filter in the JSON (confirmed by a live ESPN diagnostic).
+    // Accept season aggregate ONLY when the payload itself verifies the year.
     const stats=await getPublic(prefix+'stats?season='+season).catch(()=>null);
-    const aggregates=rosterSeasonFromStats(sport,stats);
-    if(aggregates.availableFields>=8)return {...aggregates,season,source:'ESPN season aggregate'};
+    const seasonFilter=stats?.filters?.find(x=>String(x?.name||'').toLowerCase()==='season');
+    const seasonMatches=seasonFilter&&String(seasonFilter.value)===String(season);
+    const aggregates=rosterSeasonFromStats(sport,seasonMatches?stats:null);
     const log=await getPublic(prefix+'gamelog?season='+season).catch(()=>null);
-    const history=log?normalizeGameLog(log,season):{games:[]};
+    const logSeason=log?.filters?.find(x=>String(x?.name||'').toLowerCase()==='season');
+    const validLog=log&&(!logSeason||String(logSeason.value)===String(season));
+    const history=validLog?normalizeGameLog(log,season,{regularSeasonOnly:true}):{games:[]};
     const data=rosterSeasonSummary(sport,history.games);
     const merged=mergeRosterStats(sport,aggregates,data);
     return {...merged,season,source:merged.source,failed:!aggregates.availableFields&&!history.games.length,
-      note:merged.note};
+      note:seasonMatches?merged.note:('Season aggregates were not verified; '+data.games+' ESPN regular-season game logs available')};
   },
   async games({date}={}){
     const params=sport==='cfb'?'?groups=90&limit=400':(sport==='ncaam'||sport==='ncaaw')?'?groups=50&limit=500':'';
