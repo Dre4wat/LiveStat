@@ -45,3 +45,29 @@ const api='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/27
 try{const raw=await(await fetch(api,{signal:AbortSignal.timeout(9000)})).json();
  console.log('HISTSCHEDULE '+JSON.stringify({games:raw.events?.length,first:raw.events?.slice(0,2).map(e=>({id:e.id,date:e.date,keys:Object.keys(e)}))}));
 }catch(e){console.log('HISTSCHEDULE ERROR '+e.message)}
+
+for(const [name,url] of [
+ ["nba_season_statistics",'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/27/statistics?season=2021'],
+ ["nba_team_web_stats",'https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/teams/27/statistics?season=2021'],
+ ["nba_team_players",'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/27/athletes?season=2021'],
+ ["nba_team_standings",'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/27?enable=statistics&season=2021'],
+ ["basketball_reference",'https://www.basketball-reference.com/teams/WAS/2021.html'],
+ ["nba_boxscore",'https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=401267173']
+]){
+ try{
+  const response=await fetch(url,{signal:AbortSignal.timeout(12500),headers:{'User-Agent':'Mozilla/5.0'}});
+  if(!response.ok){console.log('HISTX '+name+' '+response.status);continue}
+  if(name==='basketball_reference'){const html=await response.text();console.log('HISTX bref '+JSON.stringify({length:html.length,containsBeal:html.includes('Bradley Beal'),containsWestbrook:html.includes('Russell Westbrook'),containsRoster:html.includes('id="roster"')}));continue}
+  const data=await response.json();
+  const groups=(data.boxscore?.players||[]).map(g=>({
+    team:g.team?.displayName,
+    teamId:g.team?.id,
+    athletes:g.statistics?.flatMap(x=>x.athletes||[]).map(x=>({
+      id:x.athlete?.id,name:x.athlete?.displayName,position:x.athlete?.position?.abbreviation,starter:x.starter
+    })).slice(0,5)
+  }));
+  console.log('HISTX '+name+' '+JSON.stringify({keys:Object.keys(data),athleteCount:data.athletes?.length,
+   statisticsKeys:Object.keys(data.statistics||{}),groupCount:groups.length,groups:groups.slice(0,2),
+   teamKeys:Object.keys(data.team||{}).slice(0,15),date:data.header?.competitions?.[0]?.date}).slice(0,2400))
+ }catch(e){console.log('HISTX '+name+' ERROR '+e.message)}
+}
