@@ -107,7 +107,7 @@ const standardizeKey=(label,category,sport)=>{
    'PASSINGYARDS':'PASSYDS','RUSHINGYARDS':'RUSHYDS','RECEIVINGYARDS':'RECYDS',
    'PASYDS':'PASSYDS','PASSTD':'PASSTD','RUSHTD':'RUSHTD',
    'REC':'REC','RECEPTIONS':'REC','G':'GP','GAMESPLAYED':'GP',
-   'POINTS':'PTS','REBOUNDS':'REB','ASSISTS':'AST','STEALS':'STL','BLOCKS':'BLK'};
+   'POINTS':'PTS','REBOUNDS':'REB','ASSISTS':'AST','STEALS':'STL','BLOCKS':'BLK','TO':'TOV','TURNOVERS':'TOV'};
  const k=replacements[raw]||raw;
  if(!isFootball(sport))return k;
  if(['GP','GS','G'].includes(k))return 'GP';
