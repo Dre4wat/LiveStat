@@ -53,7 +53,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
  const getColumns=()=>gridColumns(state.sport,state.group);
  const sampleMode=()=>state.mode==='auto'?(football(state.sport)?'total':'average'):state.mode;
  const valueFor=(p,key)=>key==='GP'?num(state.stats[p.id]?.games):
-   num(state.stats[p.id]?.[sampleMode()==='total'?'totals':'averages']?.[key]);
+   num(state.stats[p.id]?.[(key.endsWith('%')?'average':sampleMode())==='total'?'totals':'averages']?.[key]);
  function sortedList(){
    const term=state.search.trim().toLocaleLowerCase();
    const rows=state.players.filter(p=>(state.group==='ALL'||positionGroupForPlayer(p,state.sport)===state.group)&&
