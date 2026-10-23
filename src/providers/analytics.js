@@ -35,13 +35,25 @@ export function normalizeGameLog(raw,season){
     const detail={};
     heading.forEach((label,i)=>{
       const column=key(label),n=numeric(values[i]);
-      if(!column||n===null)return; // Non-numeric shooting splits remain raw in groups.
-      detail[text(label)]=text(values[i]);
+      if(!column)return;
+      const rawValue=text(values[i]).trim();
+      // ESPN NBA gamelogs encode shooting as "made-attempted" (e.g. "4-10"),
+      // not a single numeric value. Preserve both component counts.
+      const split=/^(\d+)-(\d+)$/.exec(rawValue);
+      if(split&&['FG','3PT','3P','FT'].includes(column)){
+        const made=Number(split[1]),attempts=Number(split[2]);
+        const id=column==='FG'?'FG':column==='FT'?'FT':'3P';
+        const fields={ [id+'M']:made,[id+'A']:attempts };
+        for(const [field,value] of Object.entries(fields))if(!Object.hasOwn(old.stats,field))old.stats[field]=value;
+        if(attempts&&!Object.hasOwn(old.stats,id+'%'))old.stats[id+'%']=Number((made*100/attempts).toFixed(1));
+      }
+      if(n===null)return;
+      detail[text(label)]=rawValue;
       if(!Object.hasOwn(old.stats,column))old.stats[column]=n;
-      // Multiple football sections reuse YDS, TD, ATT; preserve each section
-      // separately so rushing never silently becomes passing.
       if(prefix){
-        const scoped=prefix+column;
+        // Category-scoped keys prevent collisions between QB/RB/WR categories.
+        const mapped=column==='SACK'?'SACKS':column==='INTS'?'INT':column;
+        const scoped=prefix+mapped;
         if(!Object.hasOwn(old.stats,scoped))old.stats[scoped]=n;
       }
     });
