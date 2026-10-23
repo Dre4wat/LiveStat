@@ -106,3 +106,13 @@ test('NFL roster stat aggregation loads from a season-scoped ESPN gamelog endpoi
    assert.ok(!seen.some(url=>url.includes('stats?season=2026'))); // Complete game log avoids redundant career-stat call.
  }finally{globalThis.fetch=original}
 });
+
+test('historical roster season picker includes every supported year through 1980, not just 2011',()=>{
+ const browser=createRosterBrowser({api:async()=>({teams:[]}),refresh:()=>{}});
+ const html=browser.render();
+ assert.match(html,/<option value="1980"/);
+ assert.match(html,/<option value="1996"/);
+ assert.match(html,/<option value="2001"/);
+ assert.match(html,/<option value="2011"/);
+ assert.doesNotMatch(html,/<option value="1979"/);
+});
