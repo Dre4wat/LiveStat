@@ -73,8 +73,11 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
    });
  }
  function years(){
-   const thisYear=new Date().getUTCFullYear()+2;
-   return Array.from({length:18},(_,i)=>thisYear-i);
+   // Match the validated historical-roster backend. Previously only 18
+   // options were generated, hiding real older team seasons (e.g. 1996 Bulls).
+   const top=new Date().getUTCFullYear()+2;
+   const first=1980;
+   return Array.from({length:top-first+1},(_,i)=>top-i);
  }
  function nav(){
    return '<div class="gp-roster-controls">'+
