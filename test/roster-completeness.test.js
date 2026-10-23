@@ -80,3 +80,44 @@ test('ESPN player stats API can load season aggregates without a gamelog call',a
    assert.equal(paths.filter(p=>p.includes('/gamelog')).length,0);
  }finally{globalThis.fetch=original}
 });
+
+test('Featured player biography reads ESPN athlete details without dropping name and position',async()=>{
+ const original=globalThis.fetch,urls=[];
+ globalThis.fetch=async url=>{
+   const u=String(url);urls.push(u);
+   const payload=u.endsWith('/bio')?
+     {athlete:{college:{name:'Texas Tech'},birthPlace:{city:'Tyler',state:'TX'},draft:{year:2017,round:1,selection:10}}}:
+     {athlete:{id:'3139477',displayName:'Patrick Mahomes',position:{abbreviation:'QB'},
+       displayHeight:'6 ft 2 in',displayWeight:'225 lbs',age:31,experience:{years:10},
+       headshot:{href:'https://a.espncdn.com/i/headshots/nfl/players/full/3139477.png'}}};
+   return {ok:true,json:async()=>payload};
+ };
+ try{
+   const profile=await espnProviderFor('nfl').rosterProfile('3139477');
+   assert.equal(profile.name,'Patrick Mahomes');
+   assert.equal(profile.height,'6 ft 2 in');
+   assert.equal(profile.college,'Texas Tech');
+   assert.equal(profile.birthPlace,'Tyler, TX');
+   assert.match(profile.draft,/2017/);
+   assert.ok(urls.some(u=>u.endsWith('/bio')));
+ }finally{globalThis.fetch=original}
+});
+test('Roster browser fills statistics beyond the first sixteen players without repeated taps',async()=>{
+ const {createRosterBrowser}=await import('../public/roster-browser.js');
+ const seen=[],players=Array.from({length:20},(_,i)=>({id:String(i+1),name:'Athlete '+(i+1),position:'PG'}));
+ const api=async url=>{
+   seen.push(url);
+   if(url.startsWith('/api/teams?'))return {teams:[{id:'1',name:'Test Squad'}]};
+   if(url.startsWith('/api/roster?'))return {players};
+   if(url.startsWith('/api/roster/profile?'))return {player:{id:'1',name:'Athlete 1'}};
+   if(url.startsWith('/api/roster/stats?'))return {stats:Object.fromEntries(
+     new URL(url,'https://example.test').searchParams.get('ids').split(',').map(id=>[id,{games:10,totals:{PTS:200},averages:{PTS:20}}])
+   ),errors:[]};
+   throw Error('Unexpected '+url);
+ };
+ const app=createRosterBrowser({api,refresh:()=>{},toast:()=>{}});
+ await app.open('nba');
+ await new Promise(r=>setTimeout(r,1100));
+ assert.equal(Object.keys(app.state.stats).length,20);
+ assert.ok(seen.filter(url=>url.startsWith('/api/roster/stats?')).length>=3);
+});
