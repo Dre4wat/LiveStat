@@ -46,7 +46,7 @@ function avatar(sport,p){
 }
 export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{},onTrack=()=>{}}){
  const state={sport:'nba',season:defaultRosterSeason('nba'),teamId:'',teams:[],players:[],stats:{},
-  loaded:new Set(),failed:new Set(),selectedId:null,group:'ALL',search:'',sortKey:'',mode:'auto',
+  loaded:new Set(),failed:new Set(),profiled:new Set(),selectedId:null,group:'ALL',search:'',sortKey:'',mode:'auto',
   loadingTeams:false,loadingRoster:false,loadingStats:false,ready:false,error:'',seq:0,statsCursor:0};
  const team=()=>state.teams.find(x=>String(x.id)===state.teamId)||{};
  const selected=()=>state.players.find(x=>String(x.id)===state.selectedId)||null;
@@ -103,7 +103,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
          esc(GRID_LABELS[x.key]||x.key)+'</small></div>').join(''):
          '<div class="gp-hero-stat gp-hero-loading">'+(state.failed.has(p.id)?'ESPN season statistics unavailable':state.loaded.has(p.id)?'No recorded ESPN stats for this season':'Fetching available season statistics…')+'</div>')+
      '</div><div class="gp-bio">'+
-       [['COLLEGE',p.college],['HEIGHT',p.height],['WEIGHT',p.weight],['EXPERIENCE',p.experience],['POSITION',p.position]].map(([k,v])=>
+       [['COLLEGE',p.college],['HEIGHT',p.height],['WEIGHT',p.weight],['EXPERIENCE',p.experience],['POSITION',p.position],['BIRTHPLACE',p.birthPlace],['DRAFT',p.draft]].map(([k,v])=>
          '<div><small>'+k+'</small><strong>'+esc(v==null||v===''?'—':v)+'</strong></div>').join('')+
      '</div><div class="gp-hero-actions"><button data-action="roster-analytics">CAREER &amp; SEASON STATS ↗</button>'+
        '<button data-action="roster-track">CREATE PLAYER ALERT ↗</button></div>'+
@@ -174,7 +174,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
  async function loadRoster(){
    if(!state.teamId){state.players=[];up();return}
    const seq=++state.seq,sport=state.sport,teamId=state.teamId,season=state.season;
-   state.loadingRoster=true;state.error='';state.stats={};state.loaded=new Set();state.failed=new Set();
+   state.loadingRoster=true;state.error='';state.stats={};state.loaded=new Set();state.failed=new Set();state.profiled=new Set();
    state.statsCursor=0;state.search='';state.group='ALL';state.sortKey='';state.selectedId=null;up();
    try{
      const d=await api('/api/roster?sport='+sport+'&team='+encodeURIComponent(teamId)+'&season='+season);
@@ -182,7 +182,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
      state.players=d.players||[];
      state.selectedId=String(state.players[0]?.id||'');
      state.loadingRoster=false;up();
-     if(state.players.length)prefetchRosterStats(seq);
+     if(state.players.length){loadSelectedProfile(state.selectedId,seq);prefetchRosterStats(seq)}
    }catch(e){if(seq!==state.seq)return;state.error=e.message||String(e);state.players=[]}
    finally{if(seq===state.seq){state.loadingRoster=false;up()}}
  }
@@ -197,6 +197,21 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
      if(seq===state.seq&&state.loaded.size<state.players.length)
        await new Promise(r=>setTimeout(r,420));
    }
+ }
+ async function loadSelectedProfile(id,currentSeq=state.seq){
+   if(!id||state.profiled.has(id))return;
+   state.profiled.add(id);
+   try{
+     const response=await api('/api/roster/profile?sport='+state.sport+'&athlete='+encodeURIComponent(id));
+     if(currentSeq!==state.seq)return;
+     const p=state.players.find(x=>x.id===id);
+     if(!p||!response.player)return;
+     // Enrichment never removes roster fields ESPN didn't repeat in /bio.
+     const good=Object.fromEntries(Object.entries(response.player)
+       .filter(([key,v])=>key!=='id'&&key!=='teamId'&&v!=null&&String(v).trim()!==''));
+     Object.assign(p,good);
+     up();
+   }catch(e){/* Some NCAA athletes have no separate ESPN athlete bio. */}
  }
  async function loadMore(count=8,currentSeq=state.seq){
    if(state.loadingStats||currentSeq!==state.seq)return;
@@ -229,6 +244,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
  function selectPlayer(id){
    const p=state.players.find(x=>String(x.id)===String(id));if(!p)return;
    state.selectedId=String(p.id);up();
+   loadSelectedProfile(p.id);
    if(!state.loaded.has(p.id)&&!state.loadingStats)loadMore(1);
  }
  function setSport(sport){
