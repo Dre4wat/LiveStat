@@ -102,3 +102,12 @@ try{
   futureDybantsa:x.players.some(p=>/dybantsa/i.test(p.name)),all:x.players.map(p=>p.name)
  }).slice(0,2600));
 }catch(e){console.log('WIZARDS_2021_REAL FAIL '+e.stack)}
+
+try{
+ const html=await(await fetch('https://www.basketball-reference.com/teams/WAS/2021.html',{signal:AbortSignal.timeout(12000),headers:{'User-Agent':'Mozilla/5.0'}})).text();
+ const i=html.indexOf('id="per_game_stats"'),a=html.indexOf('<tbody',i),b=html.indexOf('</tbody>',a);
+ const body=html.slice(a,b);const first=/<tr\b[^>]*>[\s\S]*?<\/tr>/i.exec(body)?.[0];
+ const player=body.indexOf('westbru01');
+ console.log('WIZARDS_PERGAME_SHAPE '+JSON.stringify({tableIndex:i,bodyLen:body.length,bodyStart:body.slice(0,1450),firstRow:first?.slice(0,1300),
+ westbrookIndex:player,westbrook:player>=0?body.slice(player,player+650):'',pts:body.match(/data-stat="[^"]*pts[^"]*"/g)?.slice(0,15)}).slice(0,4300))
+}catch(e){console.log('WIZARDS_PERGAME_SHAPE ERROR '+e.message)}
