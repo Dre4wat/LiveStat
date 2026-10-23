@@ -68,6 +68,13 @@ export function rosterSeasonSummary(sport,games){
     totals[key]=Number(total.toFixed(2));
     averages[key]=counts[key]?Number((total/counts[key]).toFixed(2)):null;
   }
+  // Shooting rate is makes / attempts across games, NOT the simple average
+  // of individual game percentages (which would overweight low-volume games).
+  for(const [made,attempted,label] of [
+    ['FGM','FGA','FG%'],['3PM','3PA','3P%'],['FTM','FTA','FT%']
+  ]){
+    if(metrics[attempted]>0)averages[label]=Number((100*metrics[made]/metrics[attempted]).toFixed(1));
+  }
   // Collision-prone YDS/TD without a position group is not safely assignable.
   // We only show scoped PASSYDS, RUSHYDS, RECYDS or defensive columns.
   const output=isFootball(sport)?totals:averages;
