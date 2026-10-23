@@ -102,3 +102,6 @@
  .gp-table-head strong{font-size:22px}
 }
 @media(max-width:430px){.gp-roster-hero{grid-template-columns:85px minmax(0,1fr);gap:9px;padding:9px}.gp-hero-main h3{font-size:29px}.gp-hero-statgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.gp-bio{grid-template-columns:repeat(2,minmax(0,1fr))}.gp-hero-actions button{font-size:8px;padding:8px 7px}}
+
+.gp-roster-scope{background:#22131c;border:1px solid #813d4a;border-left:4px solid #e94258;border-radius:8px;color:#f5b8c5;padding:11px 13px;margin:0 0 17px;font-size:10px;font-weight:900;letter-spacing:1px;text-transform:uppercase}
+.gp-roster-scope small{font-size:11px;display:block;color:#c7abb5;text-transform:none;letter-spacing:0;font-weight:600;line-height:1.55;margin-top:5px}
