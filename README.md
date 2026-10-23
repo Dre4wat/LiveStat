@@ -45,19 +45,20 @@ Files: `public/animated-cards.js`, `public/analytics-lab.js`, `public/analytics-
 **Rosters** is now a dedicated tab in desktop and mobile navigation, inspired by the roster UI in your Gamepoint project. It does **not** replace Arena's existing position-first player selection for game alerts.
 
 1. Choose **NFL, NBA, College Football, Men's College Basketball or Women's College Basketball**.
-2. Select a season and team. ESPN's roster API is queried with the selected `season` year.
+2. Select a season and team. The list is **ESPN's current team roster**, while the selected year determines which **player season statistics** to retrieve. ESPN does not reliably support a historical roster-year filter.
 3. See a Gamepoint-style featured-player panel with ESPN headshot when available, jersey, position, age, listed college, height, weight, experience and recorded season stats.
 4. Select another roster row to update that panel; filter by position group or search a name or jersey.
 5. View sport-specific, horizontally scrollable stat tables; select column headers to sort using available numbers. Basketball defaults to **per-game** sample averages; football defaults to **season totals**, with a selector to switch between them.
 6. Open **Career & Season Stats** to see that player in Analytics Lab, or **Create Player Alert** to begin choosing a game in Arena.
 
-The roster loads before the statistics finish; small cached batches fetch ESPN game logs for up to eight athletes at a time. **Load More Player Stats** fetches additional rows without blocking the browser. For college sports, some teams, older seasons, jersey data, profiles or player statistics may be unavailable.
+The team roster loads first; then a featured-athlete ESPN profile lookup fills available bio details. Statistics preferentially use ESPN's season aggregates (`/stats?season=YYYY`) and supplement missing categories with recorded ESPN game logs. Small batches fetch statistics automatically for the first ~72 athletes; additional athletes have a **Load More Player Stats** control. Basketball now displays shooting percentages, made 3-pointers, turnovers, minutes and games played, and football has position-based statistics. `…` means loading and `—` means no applicable ESPN value was returned.
 
-**Data quality:** unlike Gamepoint's locally stored historical Basketball-Reference data, LiveStat relies on ESPN's unofficial APIs. `?season=YYYY` is passed to ESPN for team rosters, but ESPN may provide incomplete or current rosters for historical years; an old-season roster should not be presented as a guaranteed verified historical snapshot. Sample stats are calculated only from returned games, not from a complete official career dataset. Unavailable stats show an em dash.
+**Historical roster limitation:** unlike Gamepoint's archived Basketball-Reference roster dataset, ESPN's current roster feed may return an **empty array** when sent `?season=YYYY`. LiveStat intentionally calls the unfiltered roster endpoint and labels the list CURRENT TEAM ROSTER. Changing season only changes the season-specific stats for those current athletes; former team members are not reconstructed. A verified past-year roster needs a separate licensed or archived roster source. Basketball season aggregates are per-game where ESPN reports averages; game-log fallbacks are samples and not guaranteed complete seasons.
 
 Routes:
 - `GET /api/roster?sport=nba&team=13&season=2026` (previous game-based use remains supported)
 - `GET /api/roster/stats?sport=nba&season=2026&ids=1966,3945274` (at most eight unique athletes per request)
+- `GET /api/roster/profile?sport=nba&athlete=1966` (featured athlete details; one profile on selection)
 - `GET /api/teams?sport=nba`
 
 Browser files: `public/roster-browser.js`, `public/roster-browser.css`; provider rules: `src/providers/roster-browser.js`; regression suite: `test/roster-browser.test.js`.
