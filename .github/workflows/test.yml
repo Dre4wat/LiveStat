@@ -26,7 +26,4 @@ jobs:
       - run: node --check public/roster-browser.js
       - run: node --check src/providers/roster-browser.js
       - run: npm test
-      - name: Research ESPN historical team rosters
-        run: node scripts/diagnose-historical-rosters.mjs
-        continue-on-error: true
 
