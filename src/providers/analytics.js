@@ -3,7 +3,7 @@ const asArray = x => Array.isArray(x) ? x : [];
 const text = x => x == null ? '' : String(x);
 const numeric = x => /^-?(?:\d+\.?\d*|\.\d+)$/.test(text(x).trim()) ? Number(x) : null;
 const key = x => text(x).trim().toUpperCase().replace(/[^A-Z0-9%]/g,'');
-export function normalizeGameLog(raw,season){
+export function normalizeGameLog(raw,season,{regularSeasonOnly=false}={}){
   const eventMeta=raw?.events || {};
   const map=new Map();
   const groups={passing:'PASS',rushing:'RUSH',receiving:'REC',defensive:'DEF',defense:'DEF',kicking:'KICK',punting:'PUNT',kickreturns:'KR',puntreturns:'PR'};
@@ -60,9 +60,31 @@ export function normalizeGameLog(raw,season){
     if(Object.keys(detail).length)old.groups[rawCategory]=detail;
     map.set(id,old);
   }
-  for(const seasonType of asArray(raw?.seasonTypes)){
+  const types=asArray(raw?.seasonTypes);
+  const hasRegular=types.some(x=>/regular/i.test(text(x?.displayName||x?.name)));
+  for(const seasonType of types){
+    const label=text(seasonType?.displayName||seasonType?.name);
+    if(regularSeasonOnly&&hasRegular&&!/regular/i.test(label))continue;
+    if(regularSeasonOnly&&!hasRegular&&/postseason|playoff|preseason/i.test(label))continue;
     for(const cat of asArray(seasonType.categories)){
-      for(const e of asArray(cat.events))add(e,cat.labels||raw?.labels,cat.displayName||cat.name);
+      for(const e of asArray(cat.events)){
+        // NFL/CFB gamelogs put multiple stat units in one flat row; the top-level
+        // categories[].count tells us exactly how to split passing/rushing/defense.
+        const parts=asArray(raw?.categories);
+        const values=Array.isArray(e?.stats)?e.stats:Array.isArray(e?.statistics)?e.statistics:[];
+        const header=asArray(raw?.labels);
+        const expected=parts.reduce((n,x)=>n+Number(x?.count||0),0);
+        if(parts.length&&expected===values.length&&header.length===values.length&&
+           parts.every(x=>Number.isInteger(Number(x?.count))&&Number(x.count)>0)){
+          let offset=0;
+          for(const part of parts){
+            const count=Number(part.count);
+            add({...e,stats:values.slice(offset,offset+count)},
+              header.slice(offset,offset+count),part.name||part.displayName);
+            offset+=count;
+          }
+        }else add(e,cat.labels||raw?.labels,cat.displayName||cat.name);
+      }
     }
   }
   for(const cat of asArray(raw?.categories)){
