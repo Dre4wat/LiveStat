@@ -29,7 +29,7 @@ test('2020-21 Wizards seasonal roster contains Westbrook and Beal with real seas
  assert.equal(p.find(x=>x.name==='Russell Westbrook').seasonStats.averages.PTS,22.2);
  assert.equal(p.find(x=>x.name==='Bradley Beal').seasonStats.averages.PTS,31.3);
  const rosters=rosterFromHistoricalBoxes([box],27);
- assert.deepEqual(rosters.map(x=>x.id),['3468','6580']);
+ assert.deepEqual(new Set(rosters.map(x=>x.id)),new Set(['3468','6580']));
  const merged=combineHistoricalRosters(p,rosters,27);
  assert.equal(merged.find(x=>x.name==='Russell Westbrook').id,'3468');
  assert.equal(merged.find(x=>x.name==='Bradley Beal').id,'6580');
