@@ -35,14 +35,16 @@ export function flattenRoster(groups){
     if(value.athlete&&typeof value.athlete==='object'){
       visit(value.athlete,depth+1);return;
     }
-    const id=value.id||value.athleteId||value.uid?.split('~a:')?.[1];
-    const name=value.displayName||value.fullName||value.name;
-    if(id&&name){
-      if(!seen.has(String(id))){seen.add(String(id));result.push({...value,id:String(id),displayName:String(name)})}
+    const collections=['items','athletes','players','roster','positionGroups','groups','entries'];
+    const hasChildren=collections.some(k=>Array.isArray(value[k])&&value[k].length);
+    if(hasChildren){
+      for(const key of collections)if(value[key])visit(value[key],depth+1);
       return;
     }
-    for(const key of ['items','athletes','players','roster','positionGroups','groups','entries']){
-      if(value[key])visit(value[key],depth+1);
+    const id=value.id||value.athleteId||value.uid?.split('~a:')?.[1];
+    const name=value.displayName||value.fullName||value.name;
+    if(/^\d{1,14}$/.test(String(id||''))&&name){
+      if(!seen.has(String(id))){seen.add(String(id));result.push({...value,id:String(id),displayName:String(name)})}
     }
   }
   visit(groups);
