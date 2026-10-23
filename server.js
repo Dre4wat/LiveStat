@@ -183,6 +183,15 @@ async function handle(req,res){
       return send(res,200,{players:entry.data,season,historical:false,rosterComplete:true,
         note:'Current team roster (not an archived roster)',source:'ESPN current roster'});
     }
+    if(req.method==='GET'&&route==='/api/roster/resolve'){
+      const {sport,provider}=providerFrom(url),name=String(url.searchParams.get('name')||'').trim();
+      if(name.length<3||name.length>90||!/^[\p{L}\p{M}\d .'-]+$/u.test(name))throw Error('Invalid historical player name');
+      const matches=await cached('rosterResolve:'+sport+':'+name.toLowerCase(),86400000,()=>provider.searchAthletes(name));
+      const normalize=x=>String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/\b(jr|sr|ii|iii|iv)\b\.?/gi,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+      const player=(matches||[]).find(p=>normalize(p.name||p.displayName)===normalize(name));
+      return send(res,200,{player:player?{id:String(player.id),name:player.name||name}:null,source:'ESPN athlete search'});
+    }
     if(req.method==='GET'&&route==='/api/roster/profile'){
       const {sport,provider}=providerFrom(url),athlete=String(url.searchParams.get('athlete')||'');
       if(!/^[0-9]{1,14}$/.test(athlete))throw Error('Invalid athlete');
