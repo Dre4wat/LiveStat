@@ -5,13 +5,13 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const leagues={nba:'NBA',nfl:'NFL',cfb:'COLLEGE FOOTBALL',ncaam:'COLLEGE BASKETBALL · MEN',ncaaw:'COLLEGE BASKETBALL · WOMEN'};
 const football=s=>s==='nfl'||s==='cfb';
 export const GRID_LABELS={
- PTS:'PTS',REB:'REB',AST:'AST',STL:'STL',BLK:'BLK','3PM':'3PM',MIN:'MIN',GP:'G',
+ PTS:'PTS',REB:'REB',AST:'AST',STL:'STL',BLK:'BLK','3PM':'3PM',MIN:'MIN',GP:'G',TOV:'TOV','FG%':'FG%','3P%':'3P%','FT%':'FT%',
  PASSYDS:'PASS YDS',PASSTD:'PASS TD',PASSINT:'PASS INT',RUSHYDS:'RUSH YDS',
  RUSHTD:'RUSH TD',CAR:'CAR',RECYDS:'REC YDS',REC:'REC',RECTD:'REC TD',
  DEFTOT:'TACK',DEFSACKS:'SACK',DEFINT:'INT',CMP:'CMP',TGTS:'TGT',YPR:'Y/REC',
  FGM:'FGM',FGA:'FGA',XPM:'XPM',XPA:'XPA',PUNTYDS:'PUNT YDS'
 };
-const basketballCols=['PTS','REB','AST','STL','BLK','3PM','MIN','GP'];
+const basketballCols=['PTS','REB','AST','STL','BLK','TOV','3PM','FG%','3P%','FT%','MIN','GP'];
 const footballCols=['PASSYDS','PASSTD','RUSHYDS','RUSHTD','REC','RECYDS','RECTD','DEFTOT','DEFSACKS','DEFINT'];
 const footballGroups={
  QB:['PASSYDS','PASSTD','PASSINT','CMP','RUSHYDS','RUSHTD'],
@@ -101,7 +101,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
      '<div class="gp-hero-statgrid">'+
        (best.length?best.map((x,i)=>'<div class="gp-hero-stat '+(!i?'highlight':'')+'"><strong>'+format(x.val)+'</strong><small>'+
          esc(GRID_LABELS[x.key]||x.key)+'</small></div>').join(''):
-         '<div class="gp-hero-stat gp-hero-loading">'+(state.loaded.has(p.id)?'No recorded ESPN stats for this season':'Fetching available season statistics…')+'</div>')+
+         '<div class="gp-hero-stat gp-hero-loading">'+(state.failed.has(p.id)?'ESPN season statistics unavailable':state.loaded.has(p.id)?'No recorded ESPN stats for this season':'Fetching available season statistics…')+'</div>')+
      '</div><div class="gp-bio">'+
        [['COLLEGE',p.college],['HEIGHT',p.height],['WEIGHT',p.weight],['EXPERIENCE',p.experience],['POSITION',p.position]].map(([k,v])=>
          '<div><small>'+k+'</small><strong>'+esc(v==null||v===''?'—':v)+'</strong></div>').join('')+
@@ -114,7 +114,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
    const heading='<div class="gp-table-head"><div><strong>'+esc(team().name||'')+' ROSTER</strong><small id="gp-roster-total">'+
     list.length+' players · tap a player to feature them</small></div><div class="gp-roster-source">'+
     (state.loadingStats?'LOADING STATS · ':'')+(football(state.sport)?'TOTALS':'PER GAME')+
-    ' · ESPN GAME LOG SAMPLE</div></div>';
+    ' · ESPN SEASON STATS + GAME LOGS</div></div>';
    return heading+'<div class="gp-roster-table-scroll"><table class="gp-roster-table"><thead><tr>'+
      '<th class="gp-rank-col">#</th><th class="gp-name-col">PLAYER</th><th>POS</th><th>JERSEY</th>'+
      columns.map(k=>'<th><button data-action="roster-sort" data-key="'+esc(k)+'" class="'+((state.sortKey||columns[0])===k?'active':'')+'">'+
@@ -126,7 +126,8 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
        '</button></td><td class="gp-pos">'+esc(p.position||'—')+'</td>'+
        '<td class="gp-jersey">'+esc(p.jersey||'—')+'</td>'+
        columns.map((k,idx)=>{const value=valueFor(p,k);
-         return '<td class="'+(idx===0?'gp-primary-col':'')+(value===null?' gp-missing':'')+'">'+format(value)+'</td>';
+         const val=value===null?(state.loaded.has(p.id)?'—':'…'):format(value);
+         return '<td class="'+(idx===0?'gp-primary-col':'')+(value===null?' gp-missing':'')+'" title="'+(value===null?(state.loaded.has(p.id)?'Not provided by ESPN':'Loading player statistics'):'ESPN season statistic')+'">'+val+'</td>';
        }).join('')+'</tr>').join('')+'</tbody></table></div>';
  }
  function render(){
@@ -137,6 +138,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
      '<h2>THE <em>ROSTER</em></h2><p>Browse teams by league and season. Tap any athlete to feature their profile and ESPN stats.</p></div>'+
      nav()+
      (state.error?'<div class="gp-error">'+esc(state.error)+'</div>':'')+
+     '<div class="gp-roster-scope">CURRENT TEAM ROSTER · '+esc(state.season)+' SEASON STATISTICS <small>ESPN does not reliably provide historical team rosters. Older season selections use today’s roster, not a verified past roster.</small></div>'+
      (state.loadingTeams||state.loadingRoster?'<div class="gp-loading">LOADING ESPN ROSTER…</div>':
        state.players.length?hero()+
          '<div class="gp-roster-filters"><div class="gp-position-filters">'+groups.map(g=>
@@ -148,7 +150,8 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
          '<option value="average" '+(state.mode==='average'?'selected':'')+'>PER GAME</option></select></label></div></div>'+
          '<div id="gp-roster-list">'+tableMarkup()+'</div>'+
          '<div class="gp-roster-end"><p>ESPN data is unofficial. Stats cover only returned games, not guaranteed complete seasons. '+
-            'Team rosters for historical years may differ from official archived records.</p>'+
+            'Season stats prioritize ESPN aggregates and fill missing fields from game logs. “…” = loading; “—” = unavailable. '+
+            'Historical rosters require an additional verified data source.</p>'+
          (state.statsCursor<state.players.length?'<button data-action="roster-more" '+(state.loadingStats?'disabled':'')+'>'+
           (state.loadingStats?'FETCHING STATISTICS…':'LOAD MORE PLAYER STATS')+'</button>':'<span>ALL ROSTER PLAYERS CHECKED</span>')+
          '</div>':('<div class="gp-empty">'+(state.teamId?'ESPN did not return a roster for this team and season.':'Choose a team to begin.')+'</div>'))+
@@ -179,9 +182,21 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
      state.players=d.players||[];
      state.selectedId=String(state.players[0]?.id||'');
      state.loadingRoster=false;up();
-     if(state.players.length)loadMore(16,seq);
+     if(state.players.length)prefetchRosterStats(seq);
    }catch(e){if(seq!==state.seq)return;state.error=e.message||String(e);state.players=[]}
    finally{if(seq===state.seq){state.loadingRoster=false;up()}}
+ }
+ async function prefetchRosterStats(seq){
+   // Request stats progressively so all normal NBA/NFL roster rows get filled,
+   // without waiting for the user to press a button 5+ times.
+   let cycles=0;
+   while(seq===state.seq&&state.loaded.size<state.players.length&&cycles<9){
+     if(state.loadingStats){await new Promise(r=>setTimeout(r,150));continue}
+     await loadMore(8,seq);
+     cycles++;
+     if(seq===state.seq&&state.loaded.size<state.players.length)
+       await new Promise(r=>setTimeout(r,420));
+   }
  }
  async function loadMore(count=8,currentSeq=state.seq){
    if(state.loadingStats||currentSeq!==state.seq)return;
