@@ -164,15 +164,24 @@ async function handle(req,res){
       if(season!==null&&(!Number.isInteger(season)||season<1980||season>new Date().getUTCFullYear()+2))throw Error('Invalid roster season');
       if(!espnProviders[sport]||!/^\d{1,8}$/.test(teamId))throw new Error('Invalid league or team');
       if(gameId&&!/^[0-9]{6,14}$/.test(gameId))throw new Error('Invalid game');
-      const k=`${sport}:${teamId}:${gameId}:${season||'current'}`,now=Date.now();
+      const yr=new Date().getUTCFullYear(),month=new Date().getUTCMonth();
+      const currentSeason=(sport==='nba'||sport==='ncaam'||sport==='ncaaw')?(month>=6?yr+1:yr):yr;
+      const historical=season!=null&&season<currentSeason&&!gameId;
+      const k=`${sport}:${teamId}:${gameId}:${season||'current'}:${historical?'historical-v2':'current'}`,now=Date.now();
       let entry=rosterCache.get(k);
-      const ttl=gameId?120000:1800000;
+      const ttl=historical?86400000:gameId?120000:1800000;
       if(!entry||now-entry.at>ttl){
-        entry={at:now,data:await espnProviders[sport].roster(teamId,{gameId,season})};
+        const abbr=teamCache.get(sport)?.data?.find(t=>String(t.id)===teamId)?.abbreviation||'';
+        const data=historical?
+          await espnProviders[sport].historicalRoster(teamId,season,{abbreviation:abbr}):
+          await espnProviders[sport].roster(teamId,{gameId,season});
+        entry={at:now,data};
         rosterCache.set(k,entry);
         if(rosterCache.size>250)rosterCache.delete(rosterCache.keys().next().value);
       }
-      return send(res,200,{players:entry.data,season,order:'ESPN depth chart, team leaders, game statistics; alphabetical fallback',source:'ESPN unofficial'});
+      if(historical)return send(res,200,entry.data);
+      return send(res,200,{players:entry.data,season,historical:false,rosterComplete:true,
+        note:'Current team roster (not an archived roster)',source:'ESPN current roster'});
     }
     if(req.method==='GET'&&route==='/api/roster/profile'){
       const {sport,provider}=providerFrom(url),athlete=String(url.searchParams.get('athlete')||'');
