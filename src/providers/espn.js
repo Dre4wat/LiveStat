@@ -6,6 +6,7 @@ import {enrichRoster} from './roster-ranking.js';
 import {normalizeGameLog,normalizeSeasonStats,normalizeESPNPlayerSearch} from './analytics.js';
 import {normalizeAthleteIdentity} from './athlete-identity.js';
 import {rosterSeasonSummary,rosterSeasonFromStats,mergeRosterStats} from './roster-browser.js';
+import {loadHistoricalRoster} from './historical-roster.js';
 export const SPORTS = {
   nfl:   {label:'NFL', path:'football/nfl', ball:'football'},
   cfb:   {label:'College Football', path:'football/college-football', ball:'football'},
@@ -68,6 +69,9 @@ export function espnProviderFor(sport){
       .filter(x=>x.id&&x.displayName).map(x=>({id:String(x.id),name:x.displayName,
         abbreviation:x.abbreviation||'',logo:x.logos?.[0]?.href||null,
         color:x.color||'',alternateColor:x.alternateColor||''})).sort((a,b)=>a.name.localeCompare(b.name));
+  },
+  async historicalRoster(teamId,season,{abbreviation}={}){
+    return loadHistoricalRoster({sport,teamId,season,abbreviation,maxGames:16});
   },
   async roster(teamId,{gameId,season}={}){
     if(!/^[0-9]{1,8}$/.test(String(teamId)))throw new Error('Invalid team');
