@@ -72,7 +72,7 @@ test('Team Rosters browser renders Gamepoint player hero, season/team selectors 
  ui.handle('roster-group',{dataset:{key:'F'}});
  assert.equal(ui.sortedList().length,1);
 });
-test('ESPN season-aware roster requests do not silently ignore selected season in URL',async()=>{
+test('ESPN basketball roster request excludes unsupported season filter to avoid empty rosters',async()=>{
  const original=globalThis.fetch,seen=[];
  globalThis.fetch=async url=>{
    const u=String(url);seen.push(u);
@@ -84,7 +84,9 @@ test('ESPN season-aware roster requests do not silently ignore selected season i
    const r=await espnProviderFor('nba').roster('13',{season:2025});
    assert.equal(r[0].name,'LeBron James');
    assert.equal(r[0].age,41);
-   assert.ok(seen.some(x=>x.includes('/teams/13/roster?season=2025')));
+   assert.ok(seen.some(x=>x.endsWith('/teams/13/roster')));
+   assert.ok(!seen.some(x=>x.includes('/teams/13/roster?season=')));
+   assert.equal(r.length,1);
  }finally{globalThis.fetch=original}
 });
 test('NFL roster stat aggregation loads from a season-scoped ESPN gamelog endpoint',async()=>{
@@ -100,6 +102,7 @@ test('NFL roster stat aggregation loads from a season-scoped ESPN gamelog endpoi
    const stat=await espnProviderFor('nfl').rosterStats('3139477',2026);
    assert.equal(stat.totals.PASSYDS,300);
    assert.equal(stat.totals.RUSHYDS,26);
-   assert.ok(seen[0].includes('gamelog?season=2026'));
+   assert.ok(seen.some(url=>url.includes('gamelog?season=2026')));
+   assert.ok(seen.some(url=>url.includes('stats?season=2026')));
  }finally{globalThis.fetch=original}
 });
