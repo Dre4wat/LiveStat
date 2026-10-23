@@ -26,6 +26,4 @@ jobs:
       - run: node --check public/roster-browser.js
       - run: node --check src/providers/roster-browser.js
       - run: npm test
-      - name: ESPN roster diagnostic (non-blocking)
-        run: node scripts/diagnose-espn-rosters.mjs
-        continue-on-error: true
+
