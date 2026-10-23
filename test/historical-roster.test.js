@@ -8,8 +8,8 @@ const fixture='<table id="roster"><tbody>'+
  '<tr><th data-stat="number">4</th><td data-stat="player" data-append-csv="westbru01"><a>Russell Westbrook</a></td><td data-stat="pos">PG</td><td data-stat="height">6-3</td><td data-stat="weight">200</td></tr>'+
  '<tr><th data-stat="number">3</th><td data-stat="player" data-append-csv="bealbr01"><a>Bradley Beal</a></td><td data-stat="pos">SG</td><td data-stat="height">6-4</td><td data-stat="weight">207</td></tr>'+
  '</tbody></table><table id="per_game_stats"><tbody>'+
- '<tr><td data-stat="player" data-append-csv="westbru01"><a>Russell Westbrook</a></td><td data-stat="games">65</td><td data-stat="pts_per_g">22.2</td><td data-stat="ast_per_g">11.7</td><td data-stat="trb_per_g">11.5</td></tr>'+
- '<tr><td data-stat="player" data-append-csv="bealbr01"><a>Bradley Beal</a></td><td data-stat="games">60</td><td data-stat="pts_per_g">31.3</td><td data-stat="ast_per_g">4.4</td></tr>'+
+ '<tr><td data-stat="name_display" data-append-csv="westbru01"><a>Russell Westbrook</a></td><td data-stat="games">65</td><td data-stat="pts_per_g">22.2</td><td data-stat="ast_per_g">11.7</td><td data-stat="trb_per_g">11.5</td></tr>'+
+ '<tr><td data-stat="name_display" data-append-csv="bealbr01"><a>Bradley Beal</a></td><td data-stat="games">60</td><td data-stat="pts_per_g">31.3</td><td data-stat="ast_per_g">4.4</td></tr>'+
  '</tbody></table>';
 const box={
  boxscore:{players:[
