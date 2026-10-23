@@ -147,7 +147,7 @@ test('ESPN career totals with no season filter are rejected for season roster ca
    assert.equal(result.totals.PASSYDS,300);
    assert.equal(result.totals.PASSTD,3);
    assert.notEqual(result.totals.PASSYDS,37248);
-   assert.match(result.note,/not verified/i);
+   assert.match(result.note,/unverified/i);
  }finally{globalThis.fetch=old}
 });
 test('real ESPN NFL gamelog category counts separate QB passing and rushing values',()=>{
