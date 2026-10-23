@@ -95,6 +95,46 @@ export function espnProviderFor(sport){
     }));
     return enrichRoster(players,sport,{depthCharts:depthResult,leaders:leaderResult,boxScore:gameResult})
   },
+  async rosterProfile(athleteId){
+    if(!/^[0-9]{1,14}$/.test(String(athleteId)))throw Error('Invalid athlete');
+    const prefix='https://site.web.api.espn.com/apis/common/v3/sports/'+SPORTS[sport].path+
+      '/athletes/'+athleteId;
+    const [root,bio]=await Promise.allSettled([
+      getPublic(prefix),getPublic(prefix+'/bio')
+    ]);
+    if(root.status==='rejected'&&bio.status==='rejected')throw Error('ESPN athlete profile unavailable');
+    const raw=root.status==='fulfilled'?root.value:{};
+    const athlete=raw.athlete||raw.player||raw;
+    const bioRaw=bio.status==='fulfilled'?bio.value:{};
+    const b=bioRaw.athlete||bioRaw.player||bioRaw;
+    const identity=normalizeAthleteIdentity({root:raw,sport,id:athleteId});
+    const rawHeight=athlete.displayHeight||b.displayHeight||athlete.height||b.height;
+    const rawWeight=athlete.displayWeight||b.displayWeight||athlete.weight||b.weight;
+    const inches=Number(rawHeight);
+    const height=typeof rawHeight==='number'||(/^\d{2,3}$/.test(String(rawHeight||''))&&inches>=48&&inches<96)
+      ?Math.floor(inches/12)+"'"+inches%12+'"':String(rawHeight||'');
+    const weight=typeof rawWeight==='number'?rawWeight+' lb':String(rawWeight||'');
+    const birthDate=athlete.dateOfBirth||b.dateOfBirth||'';
+    const dob=birthDate?new Date(birthDate):null;
+    const now=new Date();
+    const derivedAge=dob&&!Number.isNaN(dob.getTime())?now.getUTCFullYear()-dob.getUTCFullYear()-
+      (now.getUTCMonth()<dob.getUTCMonth()||(now.getUTCMonth()===dob.getUTCMonth()&&now.getUTCDate()<dob.getUTCDate())?1:0):null;
+    const age=athlete.age??b.age??derivedAge;
+    const college=athlete.college||b.college||{};
+    const place=athlete.birthPlace||b.birthPlace||{};
+    const draft=athlete.draft||b.draft||{};
+    return {...identity,
+      age:age!=null&&Number.isFinite(Number(age))?Number(age):null,
+      height,weight,
+      college:typeof college==='string'?college:String(college.name||college.displayName||''),
+      experience:athlete.experience?.displayValue??athlete.experience?.years??b.experience?.years??null,
+      birthPlace:typeof place==='string'?place:[place.city,place.state].filter(Boolean).join(', '),
+      birthDate:String(birthDate||''),
+      draft:draft.displayText||draft.displayName||[draft.year,draft.round?('Rd '+draft.round):'',draft.selection?('Pick '+draft.selection):''].filter(Boolean).join(' · '),
+      status:athlete.status?.name||athlete.status?.type||'',
+      source:'ESPN athlete profile'
+    };
+  },
   async rosterStats(athleteId,season){
     if(!/^[0-9]{1,14}$/.test(String(athleteId)))throw Error('Invalid athlete');
     if(!Number.isInteger(Number(season))||Number(season)<1980||Number(season)>new Date().getUTCFullYear()+2)throw Error('Invalid season');
