@@ -71,7 +71,7 @@ export function espnProviderFor(sport){
         color:x.color||'',alternateColor:x.alternateColor||''})).sort((a,b)=>a.name.localeCompare(b.name));
   },
   async historicalRoster(teamId,season,{abbreviation}={}){
-    return loadHistoricalRoster({sport,teamId,season,abbreviation,maxGames:16});
+    return loadHistoricalRoster({sport,teamId,season,abbreviation,maxGames:sport==='nba'?16:28});
   },
   async roster(teamId,{gameId,season}={}){
     if(!/^[0-9]{1,8}$/.test(String(teamId)))throw new Error('Invalid team');
