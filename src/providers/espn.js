@@ -5,7 +5,7 @@ import {normalizeIntelligence} from './intelligence.js';
 import {enrichRoster} from './roster-ranking.js';
 import {normalizeGameLog,normalizeSeasonStats,normalizeESPNPlayerSearch} from './analytics.js';
 import {normalizeAthleteIdentity} from './athlete-identity.js';
-import {rosterSeasonSummary} from './roster-browser.js';
+import {rosterSeasonSummary,rosterSeasonFromStats,mergeRosterStats} from './roster-browser.js';
 export const SPORTS = {
   nfl:   {label:'NFL', path:'football/nfl', ball:'football'},
   cfb:   {label:'College Football', path:'football/college-football', ball:'football'},
@@ -26,9 +26,27 @@ async function getJson(sport,endpoint){
   if(!res.ok)throw new Error(`${SPORTS[sport].label} feed returned HTTP ${res.status}`);
   return res.json();
 }
-function flattenRoster(groups){
-  if(!Array.isArray(groups))return [];
-  return groups.flatMap(g=>Array.isArray(g.items)?g.items:Array.isArray(g.athletes)?g.athletes:g.id?[g]:[]);
+export function flattenRoster(groups){
+  const result=[],seen=new Set();
+  function visit(value,depth=0){
+    if(!value||depth>5)return;
+    if(Array.isArray(value)){for(const v of value)visit(v,depth+1);return}
+    if(typeof value!=='object')return;
+    if(value.athlete&&typeof value.athlete==='object'){
+      visit(value.athlete,depth+1);return;
+    }
+    const id=value.id||value.athleteId||value.uid?.split('~a:')?.[1];
+    const name=value.displayName||value.fullName||value.name;
+    if(id&&name){
+      if(!seen.has(String(id))){seen.add(String(id));result.push({...value,id:String(id),displayName:String(name)})}
+      return;
+    }
+    for(const key of ['items','athletes','players','roster','positionGroups','groups','entries']){
+      if(value[key])visit(value[key],depth+1);
+    }
+  }
+  visit(groups);
+  return result;
 }
 function normalizePlay(p,gameId){
   return {id:String(p.id||p.sequenceNumber||`${p.period?.number||'?'}:${p.clock?.displayValue||''}:${p.text||p.shortText||''}`),
@@ -53,7 +71,10 @@ export function espnProviderFor(sport){
     if(!/^[0-9]{1,8}$/.test(String(teamId)))throw new Error('Invalid team');
     if(gameId&&!/^[0-9]{6,14}$/.test(String(gameId)))throw new Error('Invalid game');
     if(season!=null&&(!Number.isInteger(Number(season))||Number(season)<1980||Number(season)>new Date().getUTCFullYear()+2))throw Error('Invalid roster season');
-    const suffix=season!=null?'?season='+season:'';
+    // The ESPN roster endpoint usually represents the current roster.
+    // ?season=YEAR can return an empty athlete array for NBA and college basketball.
+    // Only season statistics are requested by year; do not imply a historical roster.
+    const suffix='';
     // Roster is essential; all ranking sources are optional. Missing depth chart
     // or leaders must never prevent someone from selecting a player.
     const [rosterData,depthResult,leaderResult,gameResult]=await Promise.all([
@@ -62,7 +83,7 @@ export function espnProviderFor(sport){
       getJson(sport,`/teams/${teamId}/leaders${suffix}`).catch(()=>null),
       gameId?getJson(sport,`/summary?event=${gameId}`).then(raw=>normalizeBoxScore(sport,gameId,raw)).catch(()=>null):Promise.resolve(null)
     ]);
-    const players=flattenRoster(rosterData.athletes||[]).filter(p=>p.id&&p.displayName).map(p=>({
+    const players=flattenRoster(rosterData.athletes||rosterData.roster||rosterData.players||[]).filter(p=>p.id&&p.displayName).map(p=>({
       id:String(p.id),name:p.displayName,shortName:p.shortName||p.displayName,
       position:p.position?.abbreviation||p.position?.displayName||'',
       jersey:p.jersey||'',headshot:p.headshot?.href||null,teamId:String(teamId),
@@ -77,11 +98,19 @@ export function espnProviderFor(sport){
   async rosterStats(athleteId,season){
     if(!/^[0-9]{1,14}$/.test(String(athleteId)))throw Error('Invalid athlete');
     if(!Number.isInteger(Number(season))||Number(season)<1980||Number(season)>new Date().getUTCFullYear()+2)throw Error('Invalid season');
-    const endpoint='https://site.web.api.espn.com/apis/common/v3/sports/'+SPORTS[sport].path+
-      '/athletes/'+athleteId+'/gamelog?season='+season;
-    const raw=await getPublic(endpoint);
-    const rows=normalizeGameLog(raw,season);
-    return rosterSeasonSummary(sport,rows.games);
+    const prefix='https://site.web.api.espn.com/apis/common/v3/sports/'+SPORTS[sport].path+
+      '/athletes/'+athleteId+'/';
+    // Season stats are cheaper and more complete than reconstructing seasons
+    // from game logs, particularly for defense and special teams.
+    const stats=await getPublic(prefix+'stats?season='+season).catch(()=>null);
+    const aggregates=rosterSeasonFromStats(sport,stats);
+    if(aggregates.availableFields>=8)return {...aggregates,season,source:'ESPN season aggregate'};
+    const log=await getPublic(prefix+'gamelog?season='+season).catch(()=>null);
+    const history=log?normalizeGameLog(log,season):{games:[]};
+    const data=rosterSeasonSummary(sport,history.games);
+    const merged=mergeRosterStats(sport,aggregates,data);
+    return {...merged,season,source:merged.source,failed:!aggregates.availableFields&&!history.games.length,
+      note:merged.note};
   },
   async games({date}={}){
     const params=sport==='cfb'?'?groups=90&limit=400':(sport==='ncaam'||sport==='ncaaw')?'?groups=50&limit=500':'';
