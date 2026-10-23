@@ -71,3 +71,14 @@ for(const [name,url] of [
    teamKeys:Object.keys(data.team||{}).slice(0,15),date:data.header?.competitions?.[0]?.date}).slice(0,2400))
  }catch(e){console.log('HISTX '+name+' ERROR '+e.message)}
 }
+
+try{
+ const html=await(await fetch('https://www.basketball-reference.com/teams/WAS/2021.html',{signal:AbortSignal.timeout(12000),headers:{'User-Agent':'Mozilla/5.0'}})).text();
+ for(const id of ['roster','per_game','per_game-team']){
+  const i=html.indexOf('id="'+id+'"');console.log('HISTBREF '+id+' '+JSON.stringify({index:i,chunk:i>=0?html.slice(i,i+1600):''}))
+ }
+}catch(err){console.log('HISTBREF ERROR '+err.message)}
+try{
+ const data=await(await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/27/statistics?season=2021',{signal:AbortSignal.timeout(9000)})).json();
+ console.log('HISTSTATRESULT '+JSON.stringify({results:data.results?.length,first:data.results?.slice(0,2)}).slice(0,2600))
+}catch(e){console.log('HISTSTATRESULT ERROR '+e.message)}
