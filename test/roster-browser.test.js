@@ -103,6 +103,6 @@ test('NFL roster stat aggregation loads from a season-scoped ESPN gamelog endpoi
    assert.equal(stat.totals.PASSYDS,300);
    assert.equal(stat.totals.RUSHYDS,26);
    assert.ok(seen.some(url=>url.includes('gamelog?season=2026')));
-   assert.ok(seen.some(url=>url.includes('stats?season=2026')));
+   assert.ok(!seen.some(url=>url.includes('stats?season=2026'))); // Complete game log avoids redundant career-stat call.
  }finally{globalThis.fetch=original}
 });
