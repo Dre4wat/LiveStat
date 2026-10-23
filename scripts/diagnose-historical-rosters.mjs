@@ -90,3 +90,15 @@ try{
  const firstPlayer=html.indexOf('data-append-csv="westbru01"');
  console.log('HISTBREF_TABLES '+JSON.stringify({ids,per,chunk:per>=0?html.slice(per-160,per+110):'',westbrook:firstPlayer>=0?html.slice(firstPlayer,firstPlayer+440):''}).slice(0,3000));
 }catch(err){console.log('HISTBREF_TABLES ERR '+err.message)}
+
+try{
+ const {loadHistoricalRoster}=await import('../src/providers/historical-roster.js');
+ const x=await loadHistoricalRoster({sport:'nba',teamId:'27',season:2021,abbreviation:'WSH',maxGames:16});
+ const west=x.players.find(p=>/westbrook/i.test(p.name)),beal=x.players.find(p=>/bradley beal/i.test(p.name));
+ console.log('WIZARDS_2021_REAL '+JSON.stringify({
+  count:x.players.length,source:x.source,rosterComplete:x.rosterComplete,sampledGames:x.sampledGames,
+  westbrook:west&&{name:west.name,id:west.id,pts:west.seasonStats?.averages?.PTS,reb:west.seasonStats?.averages?.REB},
+  beal:beal&&{name:beal.name,id:beal.id,pts:beal.seasonStats?.averages?.PTS},
+  futureDybantsa:x.players.some(p=>/dybantsa/i.test(p.name)),all:x.players.map(p=>p.name)
+ }).slice(0,2600));
+}catch(e){console.log('WIZARDS_2021_REAL FAIL '+e.stack)}
