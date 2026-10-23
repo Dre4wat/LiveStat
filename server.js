@@ -174,6 +174,12 @@ async function handle(req,res){
       }
       return send(res,200,{players:entry.data,season,order:'ESPN depth chart, team leaders, game statistics; alphabetical fallback',source:'ESPN unofficial'});
     }
+    if(req.method==='GET'&&route==='/api/roster/profile'){
+      const {sport,provider}=providerFrom(url),athlete=String(url.searchParams.get('athlete')||'');
+      if(!/^[0-9]{1,14}$/.test(athlete))throw Error('Invalid athlete');
+      const player=await cached('rosterProfile:'+sport+':'+athlete,3600000,()=>provider.rosterProfile(athlete));
+      return send(res,200,{player,source:'ESPN athlete profile'});
+    }
     if(req.method==='GET'&&route==='/api/roster/stats'){
       const {sport,provider}=providerFrom(url),season=Number(url.searchParams.get('season'));
       if(!Number.isInteger(season)||season<1980||season>new Date().getUTCFullYear()+2)throw Error('Invalid roster stats season');
