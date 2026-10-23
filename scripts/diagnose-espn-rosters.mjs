@@ -52,3 +52,13 @@ for(const [sport,athlete,year] of [
   }).slice(0,5400));
  }catch(err){console.log('RAW_GAMELOG '+sport+': unavailable: '+err.message)}
 }
+
+const nflUrl='https://site.web.api.espn.com/apis/common/v3/sports/football/nfl/athletes/3139477/gamelog?season=2025';
+try{
+ const raw=await (await fetch(nflUrl,{signal:AbortSignal.timeout(9000)})).json();
+ console.log('NFL_GAMELOG_CATEGORY_SCHEMA: '+JSON.stringify({
+  names:raw.names, labels:raw.labels,
+  categories:raw.categories?.map(c=>({name:c.name,displayName:c.displayName,labels:c.labels,names:c.names,
+   keys:Object.keys(c)})),firstSeasonType:raw.seasonTypes?.[0]?.displayName
+ }).slice(0,7300));
+}catch(err){console.log('NFL_GAMELOG_CATEGORY_SCHEMA error: '+err.message)}
