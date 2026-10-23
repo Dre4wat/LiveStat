@@ -5,7 +5,7 @@ import {createRosterBrowser,gridColumns,defaultRosterSeason} from '../public/ros
 import {espnProviderFor} from '../src/providers/espn.js';
 
 test('Gamepoint roster layout has unique sport-specific stat columns',()=>{
- assert.deepEqual(gridColumns('nba','ALL'),['PTS','REB','AST','STL','BLK','3PM','MIN','GP']);
+ assert.deepEqual(gridColumns('nba','ALL'),['PTS','REB','AST','STL','BLK','TOV','3PM','FG%','3P%','FT%','MIN','GP']);
  assert.deepEqual(gridColumns('ncaaw','ALL'),gridColumns('nba','ALL'));
  assert.deepEqual(gridColumns('cfb','QB'),['PASSYDS','PASSTD','PASSINT','CMP','RUSHYDS','RUSHTD']);
  assert.deepEqual(gridColumns('nfl','DL'),['DEFTOT','DEFSACKS','DEFINT']);
