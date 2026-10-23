@@ -1,4 +1,4 @@
-const CACHE='livestat-shell-v10';
+const CACHE='livestat-shell-v11';
 const STATIC=['/','/index.html','/styles.css','/cinematic.css','/app.js',
  '/boxscore.css','/boxscore.js','/intelligence.css','/intelligence-ui.js',
  '/football-stats.js','/roster-select.js','/analytics-lab.css','/analytics-lab.js',
