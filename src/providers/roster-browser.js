@@ -75,6 +75,8 @@ export function rosterSeasonSummary(sport,games){
   ]){
     if(metrics[attempted]>0)averages[label]=Number((100*metrics[made]/metrics[attempted]).toFixed(1));
   }
+  if(metrics.ATT>0&&metrics.CMP!=null)
+    averages['CMP%']=Number((100*metrics.CMP/metrics.ATT).toFixed(1));
   // Collision-prone YDS/TD without a position group is not safely assignable.
   // We only show scoped PASSYDS, RUSHYDS, RECYDS or defensive columns.
   const output=isFootball(sport)?totals:averages;
