@@ -21,7 +21,12 @@ function htmlRows(html,tableId){
    const field=/data-stat="([^"]+)"/.exec(cell[2])?.[1];
    if(!field)continue;
    obj[field]=txt(cell[3]);
-   if(field==='player')obj.brefId=/data-append-csv="([^"]+)"/.exec(cell[2])?.[1]||'';
+   // Basketball-Reference recently uses name_display instead of player
+   // in the per-game table, while the roster table uses player.
+   if(field==='player'||field==='name_display'){
+     obj.player=txt(cell[3]);
+     obj.brefId=/data-append-csv="([^"]+)"/.exec(cell[2])?.[1]||'';
+   }
   }
   if(obj.player&&obj.player!=='Player'&&!/team totals/i.test(obj.player))rows.push(obj);
  }
