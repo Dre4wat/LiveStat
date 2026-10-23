@@ -82,3 +82,11 @@ try{
  const data=await(await fetch('https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/27/statistics?season=2021',{signal:AbortSignal.timeout(9000)})).json();
  console.log('HISTSTATRESULT '+JSON.stringify({results:data.results?.length,first:data.results?.slice(0,2)}).slice(0,2600))
 }catch(e){console.log('HISTSTATRESULT ERROR '+e.message)}
+
+try{
+ const html=await(await fetch('https://www.basketball-reference.com/teams/WAS/2021.html',{signal:AbortSignal.timeout(12000),headers:{'User-Agent':'Mozilla/5.0'}})).text();
+ const ids=[...html.matchAll(/<table\b[^>]*\bid="([^"]+)"/g)].map(x=>x[1]);
+ const per=html.search(/Per Game Table/);
+ const firstPlayer=html.indexOf('data-append-csv="westbru01"');
+ console.log('HISTBREF_TABLES '+JSON.stringify({ids,per,chunk:per>=0?html.slice(per-160,per+110):'',westbrook:firstPlayer>=0?html.slice(firstPlayer,firstPlayer+440):''}).slice(0,3000));
+}catch(err){console.log('HISTBREF_TABLES ERR '+err.message)}
