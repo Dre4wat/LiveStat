@@ -96,3 +96,92 @@ export function rosterSort(players,sortKey,statistics,sport,mode='auto'){
     return String(a.name||'').localeCompare(String(b.name||''));
   });
 }
+
+
+const standardizeKey=(label,category,sport)=>{
+ const raw=String(label||'').trim().toUpperCase().replace(/[^A-Z0-9%]/g,'');
+ const group=String(category||'').toLowerCase();
+ const replacements={'3PT':'3PM','3P':'3PM','3PM':'3PM','3PA':'3PA','TRB':'REB',
+   'TACK':'DEFTOT','TACKLES':'DEFTOT','TOT':'DEFTOT','SACK':'DEFSACKS',
+   'SACKS':'DEFSACKS','INTS':'INT','INT':'INT','YARDS':'YDS',
+   'PASSINGYARDS':'PASSYDS','RUSHINGYARDS':'RUSHYDS','RECEIVINGYARDS':'RECYDS',
+   'PASYDS':'PASSYDS','PASSTD':'PASSTD','RUSHTD':'RUSHTD',
+   'REC':'REC','RECEPTIONS':'REC','G':'GP','GAMESPLAYED':'GP',
+   'POINTS':'PTS','REBOUNDS':'REB','ASSISTS':'AST','STEALS':'STL','BLOCKS':'BLK'};
+ const k=replacements[raw]||raw;
+ if(!isFootball(sport))return k;
+ if(['GP','GS','G'].includes(k))return 'GP';
+ const prefix=/pass/.test(group)?'PASS':/rush/.test(group)?'RUSH':
+   /receiv/.test(group)?'REC':/defen|tackling/.test(group)?'DEF':
+   /kick/.test(group)?'KICK':/punt/.test(group)?'PUNT':'';
+ if(prefix){
+   if(['YDS','TD','INT','ATT','CMP','CAR','TOT','SACKS','SACK','TGTS','REC'].includes(raw)||['YDS','TD','INT','TOT'].includes(k)){
+     if(prefix==='DEF'&&['TOT','TACK','TACKLES'].includes(raw))return 'DEFTOT';
+     if(prefix==='DEF'&&['INT','INTS'].includes(raw))return 'DEFINT';
+     if(prefix==='DEF'&&['SACK','SACKS'].includes(raw))return 'DEFSACKS';
+     if(prefix==='PASS'&&raw==='INT')return 'PASSINT';
+     if(prefix==='REC'&&['REC','RECEPTIONS'].includes(raw))return 'REC';
+     if(prefix==='REC'&&raw==='TGTS')return 'TGTS';
+     if(prefix==='RUSH'&&raw==='CAR')return 'CAR';
+     if(prefix==='PASS'&&['ATT','CMP'].includes(raw))return raw;
+     return prefix+(raw==='SACK'?'SACKS':raw==='INTS'?'INT':raw);
+   }
+ }
+ // Ambiguous YDS, TD and INT values are not assigned to a football unit
+ // unless their ESPN category actually identifies the passing/rushing section.
+ return ['YDS','TD','INT'].includes(raw)?null:k;
+};
+const statNumber=x=>{
+ if(typeof x==='number')return Number.isFinite(x)?x:null;
+ if(x===null||x===undefined)return null;
+ const a=String(x).trim().replace(/,/g,'');
+ return /^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(a)?Number(a):null;
+};
+function parseCategories(raw){
+ return [...(Array.isArray(raw?.categories)?raw.categories:[]),
+   ...(Array.isArray(raw?.splits?.categories)?raw.splits.categories:[]),
+   ...(Array.isArray(raw?.stats?.categories)?raw.stats.categories:[])];
+}
+export function rosterSeasonFromStats(sport,raw){
+ const totals={},averages={},known=new Set();
+ const cats=parseCategories(raw);
+ for(const section of cats){
+   const category=section.name||section.displayName||'';
+   const pairs=Array.isArray(section.stats)?
+     section.stats.map(item=>[item.abbreviation||item.name||item.displayName,item.displayValue??item.value]):
+     (section.labels||[]).map((label,i)=>[label,(section.totals||section.values||[])[i]]);
+   for(const [label,value] of pairs){
+     const key=standardizeKey(label,category,sport),n=statNumber(value);
+     if(!key||n===null)continue;
+     if(known.has(key))continue;
+     known.add(key);
+     if(isFootball(sport))totals[key]=n;
+     else averages[key]=n;
+   }
+ }
+ const games=statNumber(totals.GP??averages.GP)||null;
+ if(games&&isFootball(sport))for(const [key,total] of Object.entries(totals))averages[key]=Number((total/games).toFixed(2));
+ // ESPN basketball /stats labels regularly report per-game values in "totals".
+ // Never assert they're season totals when that isn't specified.
+ if(games&&!isFootball(sport))for(const [key,avg] of Object.entries(averages)){
+   if(!['GP','GS'].includes(key))totals[key]=Number((avg*games).toFixed(2));
+ }
+ return {games,totals,averages,
+   values:isFootball(sport)?totals:averages,
+   source:known.size?'ESPN season aggregate':'unavailable',
+   sample:false,availableFields:known.size,
+   note:known.size?'ESPN season statistics; game logs fill only missing fields':'ESPN did not return season statistics'};
+}
+export function mergeRosterStats(sport,seasonData,gamelogData){
+ const official=seasonData||rosterSeasonFromStats(sport,{});
+ const detail=gamelogData||rosterSeasonSummary(sport,[]);
+ const totals={...detail.totals,...official.totals},averages={...detail.averages,...official.averages};
+ const games=official.games||detail.games||null;
+ return {games,totals,averages,values:isFootball(sport)?totals:averages,
+   source:official.availableFields?'ESPN season aggregate + game logs':detail.source,
+   officialFields:official.availableFields||0,
+   sample:!official.availableFields,
+   note:official.availableFields?
+     'Official ESPN season aggregate when available; other statistics from recorded games':
+     'Available ESPN game-log sample; not necessarily all games'};
+}
