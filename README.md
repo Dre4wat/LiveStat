@@ -51,9 +51,9 @@ Files: `public/animated-cards.js`, `public/analytics-lab.js`, `public/analytics-
 5. View sport-specific, horizontally scrollable stat tables; select column headers to sort using available numbers. Basketball defaults to **per-game** sample averages; football defaults to **season totals**, with a selector to switch between them.
 6. Open **Career & Season Stats** to see that player in Analytics Lab, or **Create Player Alert** to begin choosing a game in Arena.
 
-The team roster loads first; then a featured-athlete ESPN profile lookup fills available bio details. Statistics preferentially use ESPN's season aggregates (`/stats?season=YYYY`) and supplement missing categories with recorded ESPN game logs. Small batches fetch statistics automatically for the first ~72 athletes; additional athletes have a **Load More Player Stats** control. Basketball now displays shooting percentages, made 3-pointers, turnovers, minutes and games played, and football has position-based statistics. `…` means loading and `—` means no applicable ESPN value was returned.
+The team roster loads first; then a featured-athlete ESPN profile lookup fills available bio details. Statistics preferentially use **ESPN's season-filtered regular-season game logs**. Some ESPN `/stats?season=YYYY` responses unexpectedly contain full CAREER totals without a season filter, so LiveStat rejects those as season figures; only aggregates explicitly verified for the requested year may fill remaining categories. Small batches fetch statistics automatically for the first ~72 athletes; additional athletes have a **Load More Player Stats** control. Basketball now displays shooting percentages, made 3-pointers, turnovers, minutes and games played, and football has position-based statistics. `…` means loading and `—` means no applicable ESPN value was returned.
 
-**Historical roster limitation:** unlike Gamepoint's archived Basketball-Reference roster dataset, ESPN's current roster feed may return an **empty array** when sent `?season=YYYY`. LiveStat intentionally calls the unfiltered roster endpoint and labels the list CURRENT TEAM ROSTER. Changing season only changes the season-specific stats for those current athletes; former team members are not reconstructed. A verified past-year roster needs a separate licensed or archived roster source. Basketball season aggregates are per-game where ESPN reports averages; game-log fallbacks are samples and not guaranteed complete seasons.
+**Historical roster limitation:** unlike Gamepoint's archived Basketball-Reference roster dataset, ESPN's current roster feed may return an **empty array** when sent `?season=YYYY`. LiveStat intentionally calls the unfiltered roster endpoint and labels the list CURRENT TEAM ROSTER. Changing season only changes the season-specific stats for those current athletes; former team members are not reconstructed. A verified past-year roster needs a separate licensed or archived roster source. Basketball averages, shooting percentages (made/attempted), and football passing/rushing/defensive totals are calculated from the regular-season games ESPN actually returned. These are not guaranteed complete official-season totals.
 
 Routes:
 - `GET /api/roster?sport=nba&team=13&season=2026` (previous game-based use remains supported)
@@ -61,7 +61,7 @@ Routes:
 - `GET /api/roster/profile?sport=nba&athlete=1966` (featured athlete details; one profile on selection)
 - `GET /api/teams?sport=nba`
 
-Browser files: `public/roster-browser.js`, `public/roster-browser.css`; provider rules: `src/providers/roster-browser.js`; regression suite: `test/roster-browser.test.js`.
+Browser files: `public/roster-browser.js`, `public/roster-browser.css`; provider rules: `src/providers/roster-browser.js`; regression suites: `test/roster-browser.test.js`, `test/roster-completeness.test.js`. You can run a read-only live ESPN schema diagnostic manually with `node scripts/diagnose-espn-rosters.mjs`; GitHub's regular test workflow uses deterministic fixtures instead.
 
 ## LiveStat Analytics Lab (v1.2)
 
