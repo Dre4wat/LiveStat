@@ -210,7 +210,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
    }
  }
  async function loadSelectedProfile(id,currentSeq=state.seq){
-   if(!id||!/^\d{1,14}$/.test(String(id))||state.profiled.has(id))return;
+   if(!id||state.rosterMeta?.historical||!/^\d{1,14}$/.test(String(id))||state.profiled.has(id))return;
    state.profiled.add(id);
    try{
      const response=await api('/api/roster/profile?sport='+state.sport+'&athlete='+encodeURIComponent(id));
