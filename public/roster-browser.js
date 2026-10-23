@@ -47,7 +47,7 @@ function avatar(sport,p){
 export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{},onTrack=()=>{}}){
  const state={sport:'nba',season:defaultRosterSeason('nba'),teamId:'',teams:[],players:[],stats:{},
   loaded:new Set(),failed:new Set(),profiled:new Set(),selectedId:null,group:'ALL',search:'',sortKey:'',mode:'auto',
-  loadingTeams:false,loadingRoster:false,loadingStats:false,ready:false,error:'',seq:0,statsCursor:0};
+  loadingTeams:false,loadingRoster:false,loadingStats:false,ready:false,error:'',seq:0,statsCursor:0,rosterMeta:null};
  const team=()=>state.teams.find(x=>String(x.id)===state.teamId)||{};
  const selected=()=>state.players.find(x=>String(x.id)===state.selectedId)||null;
  const getColumns=()=>gridColumns(state.sport,state.group);
@@ -138,7 +138,13 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
      '<h2>THE <em>ROSTER</em></h2><p>Browse teams by league and season. Tap any athlete to feature their profile and ESPN stats.</p></div>'+
      nav()+
      (state.error?'<div class="gp-error">'+esc(state.error)+'</div>':'')+
-     '<div class="gp-roster-scope">CURRENT TEAM ROSTER · '+esc(state.season)+' SEASON STATISTICS <small>ESPN does not reliably provide historical team rosters. Older season selections use today’s roster, not a verified past roster.</small></div>'+
+     '<div class="gp-roster-scope">'+
+      (state.rosterMeta?.historical?'HISTORICAL '+esc(state.season)+' TEAM ROSTER':'CURRENT TEAM ROSTER')+
+      ' <small>'+esc(state.rosterMeta?.note||'Select a team to browse the available roster')+
+      (state.rosterMeta?.source?' · Source: '+esc(state.rosterMeta.source):'')+
+      (state.rosterMeta?.sampledGames?' · '+state.rosterMeta.sampledGames+' historical game boxes checked':'')+
+      (state.rosterMeta?.warning?' · '+esc(state.rosterMeta.warning):'')+
+      '</small></div>'+
      (state.loadingTeams||state.loadingRoster?'<div class="gp-loading">LOADING ESPN ROSTER…</div>':
        state.players.length?hero()+
          '<div class="gp-roster-filters"><div class="gp-position-filters">'+groups.map(g=>
@@ -150,8 +156,8 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
          '<option value="average" '+(state.mode==='average'?'selected':'')+'>PER GAME</option></select></label></div></div>'+
          '<div id="gp-roster-list">'+tableMarkup()+'</div>'+
          '<div class="gp-roster-end"><p>ESPN data is unofficial. Stats cover only returned games, not guaranteed complete seasons. '+
-            'Season stats prioritize ESPN aggregates and fill missing fields from game logs. “…” = loading; “—” = unavailable. '+
-            'Historical rosters require an additional verified data source.</p>'+
+            'Historical team membership comes from season records when available. “…” = loading; “—” = unavailable. '+
+            'ESPN season game-box coverage may be incomplete for college and football rosters.</p>'+
          (state.statsCursor<state.players.length?'<button data-action="roster-more" '+(state.loadingStats?'disabled':'')+'>'+
           (state.loadingStats?'FETCHING STATISTICS…':'LOAD MORE PLAYER STATS')+'</button>':'<span>ALL ROSTER PLAYERS CHECKED</span>')+
          '</div>':('<div class="gp-empty">'+(state.teamId?'ESPN did not return a roster for this team and season.':'Choose a team to begin.')+'</div>'))+
@@ -174,12 +180,17 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
  async function loadRoster(){
    if(!state.teamId){state.players=[];up();return}
    const seq=++state.seq,sport=state.sport,teamId=state.teamId,season=state.season;
-   state.loadingRoster=true;state.error='';state.stats={};state.loaded=new Set();state.failed=new Set();state.profiled=new Set();
+   state.loadingRoster=true;state.error='';state.stats={};state.loaded=new Set();state.failed=new Set();state.profiled=new Set();state.rosterMeta=null;
    state.statsCursor=0;state.search='';state.group='ALL';state.sortKey='';state.selectedId=null;up();
    try{
      const d=await api('/api/roster?sport='+sport+'&team='+encodeURIComponent(teamId)+'&season='+season);
      if(seq!==state.seq)return;
      state.players=d.players||[];
+     state.rosterMeta=d;
+     for(const p of state.players){
+       if(p.seasonStats){state.stats[p.id]=p.seasonStats;state.loaded.add(p.id)}
+       if(!/^\d{1,14}$/.test(String(p.id)))state.failed.add(p.id);
+     }
      state.selectedId=String(state.players[0]?.id||'');
      state.loadingRoster=false;up();
      if(state.players.length){loadSelectedProfile(state.selectedId,seq);prefetchRosterStats(seq)}
@@ -199,7 +210,7 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
    }
  }
  async function loadSelectedProfile(id,currentSeq=state.seq){
-   if(!id||state.profiled.has(id))return;
+   if(!id||!/^\d{1,14}$/.test(String(id))||state.profiled.has(id))return;
    state.profiled.add(id);
    try{
      const response=await api('/api/roster/profile?sport='+state.sport+'&athlete='+encodeURIComponent(id));
@@ -257,6 +268,13 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
    if(!state.ready){state.ready=true;return loadTeams()}
    up();return Promise.resolve();
  }
+ async function resolveHistoricalAthlete(p){
+   try{
+     const resolved=await api('/api/roster/resolve?sport='+encodeURIComponent(state.sport)+
+       '&name='+encodeURIComponent(p.name));
+     return resolved?.player?.id||null;
+   }catch(e){return null}
+ }
  function handle(action,node){
    const d=node?.dataset||{};
    if(action==='roster-select'){selectPlayer(d.id);return true}
@@ -267,7 +285,14 @@ export function createRosterBrowser({api,refresh,toast=()=>{},onAnalytics=()=>{}
    if(action==='roster-sort'){state.sortKey=d.key;up();return true}
    if(action==='roster-more'){loadMore(8);return true}
    if(action==='roster-analytics'){
-     const p=selected();if(p)onAnalytics(p,state.sport,{team:team(),season:state.season});return true;
+     const p=selected();
+     if(p){
+       if(/^\d{1,14}$/.test(String(p.id)))onAnalytics(p,state.sport,{team:team(),season:state.season});
+       else resolveHistoricalAthlete(p).then(id=>{
+         if(!id)return toast('ESPN player ID not found for this historical athlete');
+         onAnalytics({...p,id,espnId:id},state.sport,{team:team(),season:state.season});
+       });
+     }return true;
    }
    if(action==='roster-track'){onTrack(state.sport);return true}
    return false;
